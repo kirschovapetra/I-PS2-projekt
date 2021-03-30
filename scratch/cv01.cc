@@ -34,6 +34,11 @@ using namespace ns3;
 NS_LOG_COMPONENT_DEFINE ("FirstScriptExample");
 
 
+void f(){
+  NS_LOG_UNCOND("dsfsdf\n");
+}
+
+
 int main (int argc, char *argv[]) {
   CommandLine cmd (__FILE__);
   cmd.Parse (argc, argv);
@@ -86,6 +91,23 @@ int main (int argc, char *argv[]) {
   // kedy sa spusti a stopne
   clientApps.Start (Seconds (2.0));
   clientApps.Stop (Seconds (10.0));
+
+
+  // po 4. sekunde sa spusti funkcia f
+  Simulator::Schedule(Seconds(4.0), f);
+
+  // ulozenie konfiguracie do xml
+//  Config::SetDefault("ns3::ConfigStore::Filename", StringValue("out.xml"));
+//  Config::SetDefault("ns3::ConfigStore::FileFormat", StringValue("RawText"));
+//  Config::SetDefault("ns3::ConfigStore::Mode", StringValue("Save"));
+//  ConfigStore cs;
+//  cs.ConfigureAttributes();
+//  cs.ConfigureDefaults();
+
+  // custom konfig cez okno
+//   GtkConfigStore csgtk;
+//   csgtk.ConfigureAttributes();
+//   csgtk.ConfigureDefaults();
 
   // spustenie simulacie
   Simulator::Run ();
