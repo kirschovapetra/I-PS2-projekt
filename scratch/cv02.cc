@@ -23,7 +23,7 @@
 
 using namespace ns3;
 
-NS_LOG_COMPONENT_DEFINE ("cvicenie2o13");
+NS_LOG_COMPONENT_DEFINE ("cvicenie2");
 
 static void GenerateTraffic (Ptr<Socket> socket, uint32_t pktCount, Time pktInterval ){
   if (pktCount > 0) {
@@ -140,8 +140,8 @@ int main (int argc, char *argv[]) {
 
   auto csmaIp_1 = csmaNodes.Get(1)->GetObject<Ipv4>()->GetAddress(1,0).GetLocal(); // n2
   auto csmaIp_2 = csmaNodes.Get(2)->GetObject<Ipv4>()->GetAddress(1,0).GetLocal(); // n3
-  NS_LOG_UNCOND("N2: "+csmaIp_1);
-  NS_LOG_UNCOND("N3: "+csmaIp_2);
+  NS_LOG_UNCOND(csmaIp_1);
+  NS_LOG_UNCOND(csmaIp_2);
 
   /****** server = n2 ******/
 
@@ -162,13 +162,13 @@ int main (int argc, char *argv[]) {
   clientApps.Start (Seconds (2.0));
   clientApps.Stop (Seconds (20.0));
 
-  /****** socket = n7 ******/
+  /****** socket = n7 sa pripoji na IP n3 ******/
 
   Ptr<Socket> socket = Socket::CreateSocket (wifiNodes.Get(2), TypeId::LookupByName ("ns3::UdpSocketFactory"));
   socket->Connect (InetSocketAddress (csmaIp_2, 80)); // IP n3
 
   PacketSinkHelper sinkHelper ("ns3::UdpSocketFactory", InetSocketAddress (csmaIp_2, 80)); // IP n3
-  ApplicationContainer sinkApp = sinkHelper.Install (csmaNodes.Get(2)); // n4
+  ApplicationContainer sinkApp = sinkHelper.Install (csmaNodes.Get(2)); // n3
   sinkApp.Start(Seconds(2.0));
   sinkApp.Stop(Seconds(10.0));
 
