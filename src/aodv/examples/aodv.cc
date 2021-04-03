@@ -49,9 +49,10 @@ using namespace ns3;
  * only 34 of 100 pings being received.  If the step size is reduced
  * to cover the gap, then all pings can be received.
  */
-class AodvExample 
-{
+class AodvExample {
+
 public:
+
   AodvExample ();
   /**
    * \brief Configure script parameters
@@ -157,14 +158,9 @@ AodvExample::Run ()
   Simulator::Destroy ();
 }
 
-void
-AodvExample::Report (std::ostream &)
-{ 
-}
+void AodvExample::Report (std::ostream &) {}
 
-void
-AodvExample::CreateNodes ()
-{
+void AodvExample::CreateNodes () {
   std::cout << "Creating " << (unsigned)size << " nodes " << step << " m apart.\n";
   nodes.Create (size);
   // Name nodes
