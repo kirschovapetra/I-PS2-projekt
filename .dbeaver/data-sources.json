@@ -1,0 +1,30 @@
+{
+	"folders": {},
+	"connections": {
+		"sqlite_jdbc-17897d52e36-423f5302948ca5b0": {
+			"provider": "generic",
+			"driver": "sqlite_jdbc",
+			"name": "testDB.db",
+			"save-password": true,
+			"read-only": false,
+			"configuration": {
+				"database": "/home/student/Documents/ns3/ns-3/testDB.db",
+				"url": "jdbc:sqlite:/home/student/Documents/ns3/ns-3/testDB.db",
+				"type": "dev",
+				"auth-model": "native",
+				"handlers": {}
+			}
+		}
+	},
+	"connection-types": {
+		"dev": {
+			"name": "Development",
+			"color": "255,255,255",
+			"description": "Regular development database",
+			"auto-commit": true,
+			"confirm-execute": false,
+			"confirm-data-change": false,
+			"auto-close-transactions": false
+		}
+	}
+}

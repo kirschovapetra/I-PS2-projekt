@@ -49,7 +49,7 @@ public:
 };
 
 void
-IntTrace (int32_t oldValue, int32_t newValue)
+CallbackFunc (int32_t oldValue, int32_t newValue)
 {
   std::cout << "Traced " << oldValue << " to " << newValue << std::endl;
 }
@@ -58,7 +58,7 @@ int
 main (int argc, char *argv[])
 {
   Ptr<MyObject> myObject = CreateObject<MyObject> ();
-  myObject->TraceConnectWithoutContext ("MyInteger", MakeCallback (&IntTrace));
+  myObject->TraceConnectWithoutContext ("MyInteger", MakeCallback (&CallbackFunc));
 
   myObject->m_myInt = 1234;
 }
