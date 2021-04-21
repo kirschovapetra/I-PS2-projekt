@@ -26,8 +26,10 @@ rôzna linka: Synchronizácia pri príjazdoch na zástavku/odchod
 Efektivita môže byť definovaná ako skrátenie času presunu, alebo minimalizovanie státia, či minimalizovanie zrýchľovania/spomaľovania pohybu.
 
 
-List position allocator: https://coe.northeastern.edu/Research/krclab/crens3-doc/classns3_1_1_list_position_allocator.html
-Mapa elektriciek: https://dpba.blob.core.windows.net/media/Default/Obr%C3%A1zky/elektricky_201912.png
+* List position allocator: https://coe.northeastern.edu/Research/krclab/crens3-doc/classns3_1_1_list_position_allocator.html
+* Mapa elektriciek: https://dpba.blob.core.windows.net/media/Default/Obr%C3%A1zky/elektricky_201912.png
+* Waypoint mobility model: https://groups.google.com/g/ns-3-users/c/8r07uUD78Dk
+
 
  */
 
@@ -94,6 +96,9 @@ void elektrickyWaypointModel(MobilityHelper& mobility, NodeContainer& nody_elekt
    *      * nastavit mobility helperu dany model a nainstalovat jednu elektricku
    */
 
+  mobility.SetMobilityModel("ns3::WaypointMobilityModel",
+                            "LazyNotify",BooleanValue(true));
+  mobility.Install(nody_elektricky);
 
   // init pozicie elektriciek
 
@@ -108,50 +113,46 @@ void elektrickyWaypointModel(MobilityHelper& mobility, NodeContainer& nody_elekt
   }
 
   // waypoint model
-  ObjectFactory mobilityFactory;
-  mobilityFactory.SetTypeId ("ns3::WaypointMobilityModel");
-  mobilityFactory.Set ("LazyNotify", BooleanValue (true));
-
-  Ptr<MobilityModel> model = mobilityFactory.Create()->GetObject<MobilityModel>();
-  Ptr<WaypointMobilityModel> mob = model->GetObject<WaypointMobilityModel>();
+//  ObjectFactory mobilityFactory;
+//  mobilityFactory.SetTypeId ("ns3::WaypointMobilityModel");
+//  mobilityFactory.Set ("LazyNotify", BooleanValue (true));
+//
+//  Ptr<MobilityModel> model = mobilityFactory.Create()->GetObject<MobilityModel>();
+//  Ptr<WaypointMobilityModel> mob = model->GetObject<WaypointMobilityModel>();
 
 
   /* elektricka 1: A (0) -> B (1) -> C (2) -> D (3) -> H (7)-> I (8)*/
 
   vector<int> elektricka1_cesta{0,1,2,3,7,8};
+  Ptr<WaypointMobilityModel> elektricka1_waypointModel =
+      DynamicCast<WaypointMobilityModel>( nody_elektricky.Get(0)->GetObject<MobilityModel>() );
 
-  for (auto i : elektricka1_cesta) {
-      mob->AddWaypoint (Waypoint(Seconds(interval*(i+1)), pozicie_zastavok[i]));
+  for (int i = 0; i < elektricka1_cesta.size(); i++) {
+      elektricka1_waypointModel->AddWaypoint (Waypoint(Seconds(interval*i), pozicie_zastavok[elektricka1_cesta[i]]));
   }
-//  mob->SetPosition(pozicie_zastavok[0]);
-  nody_elektricky.Get(0)->AggregateObject(mob);
-  mobility.Install(nody_elektricky.Get(0));
 
-
-  // TODO viacero elektriciek mi nechce ist :((
-  // + casom spomaluje z nejakeho dovodu
 
   /* elektricka 2: E (4) -> F (5) -> G (6) -> J (9) */
 
-//  vector<int> elektricka2_cesta{4,5,6,9};
-//
-//  for (auto i : elektricka2_cesta) {
-//          mob->AddWaypoint (Waypoint(Seconds(interval * i), pozicie_zastavok[i]));
-//    }
-//  mob->SetPosition(pozicie_zastavok[4]);
-//  nody_elektricky.Get(1)->AggregateObject(mob);
-//  mobility.Install(nody_elektricky.Get(1));
-//
-  /* elektricka 3: A (0)-> B (1) -> F (2)-> H (5) ->  G (6) -> J (9) */
+  vector<int> elektricka2_cesta{4,5,6,9};
+  Ptr<WaypointMobilityModel> elektricka2_waypointModel =
+      DynamicCast<WaypointMobilityModel>( nody_elektricky.Get(1)->GetObject<MobilityModel>() );
 
-//  vector<int> elektricka3_cesta{0,1,2,5,6,9};
-//
-//  for (auto i : elektricka3_cesta) {
-//        mob->AddWaypoint (Waypoint(Seconds(interval * i), pozicie_zastavok[i]));
-//  }
-//  mob->SetPosition(pozicie_zastavok[0]);
-//  nody_elektricky.Get(2)->AggregateObject(mob);
-//  mobility.Install(nody_elektricky.Get(2));
+  for (int i = 0; i < elektricka2_cesta.size(); i++) {
+      elektricka2_waypointModel->AddWaypoint (Waypoint(Seconds(interval*i), pozicie_zastavok[elektricka2_cesta[i]]));
+  }
+
+
+  /* elektricka 3: J (9) -> G (6) -> H (5) -> F (2) -> B (1) -> A (0) */
+
+  vector<int> elektricka3_cesta{9,6,5,2,1, 0};
+  Ptr<WaypointMobilityModel> elektricka3_waypointModel =
+      DynamicCast<WaypointMobilityModel>( nody_elektricky.Get(2)->GetObject<MobilityModel>() );
+
+  for (int i = 0; i < elektricka3_cesta.size(); i++) {
+      elektricka3_waypointModel->AddWaypoint (Waypoint(Seconds(interval*i), pozicie_zastavok[elektricka3_cesta[i]]));
+  }
+
 }
 
 
@@ -194,7 +195,7 @@ int main(int argc, char *argv[]) {
   }
 
   // rozmiestnenie elektriciek
-    elektrickyWaypointModel(mobility,nody_elektricky, pozicie_zastavok, 10.0);
+    elektrickyWaypointModel(mobility,nody_elektricky, pozicie_zastavok, 5.0);
 
 
 //L2
