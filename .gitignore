@@ -13,5 +13,4 @@ build/**/**
 .lock-waf_linux_build
 */source-temp/
 ns3_html_theme/static/ns3_version.js
-bindings/python/*
 **/__pycache__/
