@@ -24,8 +24,13 @@ Efektivita môže byť definovaná ako skrátenie času presunu, alebo minimaliz
 #include <ns3/config.h>
 #include <ns3/csma-helper.h>
 #include <ns3/data-rate.h>
+#include <ns3/event-id.h>
 #include <ns3/internet-stack-helper.h>
+#include <ns3/ipv4.h>
+#include <ns3/ipv4-address.h>
 #include <ns3/ipv4-address-helper.h>
+#include <ns3/ipv4-global-routing-helper.h>
+#include <ns3/ipv4-interface-address.h>
 #include <ns3/ipv4-interface-container.h>
 #include <ns3/log.h>
 #include <ns3/mobility-helper.h>
@@ -36,9 +41,11 @@ Efektivita môže byť definovaná ako skrátenie času presunu, alebo minimaliz
 #include <ns3/node-list.h>
 #include <ns3/nstime.h>
 #include <ns3/object.h>
+#include <ns3/packet.h>
 #include <ns3/position-allocator.h>
 #include <ns3/ptr.h>
 #include <ns3/simulator.h>
+#include <ns3/socket.h>
 #include <ns3/ssid.h>
 #include <ns3/vector.h>
 #include <ns3/waypoint.h>
@@ -49,6 +56,7 @@ Efektivita môže byť definovaná ako skrátenie času presunu, alebo minimaliz
 #include <stddef.h>
 #include <cstdlib>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -200,6 +208,7 @@ Ptr <Node> GetNodeFromContext (string& context) {
 }
 
 
+
 static void CourseChange (std::string context, Ptr<const MobilityModel> model) {
 
 
@@ -228,6 +237,44 @@ static void CourseChange (std::string context, Ptr<const MobilityModel> model) {
     }
 }
 
+
+
+void ReceivePacket (Ptr<Socket> socket) {
+
+  while (Ptr<Packet> packet = socket->Recv()){
+      int packetSize = packet->GetSize();
+      uint8_t *buffer = new uint8_t[packetSize];
+
+      int size = packet->CopyData(buffer, packetSize);
+      string packetContent = string(buffer, buffer + packetSize);
+
+      Ptr<Ipv4> ipv4 = socket -> GetNode() -> GetObject<Ipv4>();
+      Ipv4InterfaceAddress iaddr = ipv4->GetAddress (1,0);
+
+      cout<< "Receiver: " << iaddr.GetLocal() << endl;
+      cout<< "Received:" << packetContent << endl << endl;
+    }
+}
+
+static void GenerateTraffic (Ptr<Socket> socket, uint32_t pktSize, uint32_t pktCount, Time pktInterval ) {
+  Ptr<Ipv4> ipv4 = socket -> GetNode() -> GetObject<Ipv4> ();
+  Ipv4InterfaceAddress iaddr = ipv4->GetAddress (1,0);
+
+  ostringstream msg; msg << "Hello World from " << iaddr.GetLocal() << '\0';
+
+
+  if (pktCount > 0) {
+      uint16_t packetSize = msg.str().length()+1;
+      Ptr<Packet> packet = Create<Packet>((uint8_t*) msg.str().c_str(), packetSize);
+      socket->Send (packet);
+      Simulator::Schedule (pktInterval, &GenerateTraffic, socket, pktSize, pktCount - 1, pktInterval);
+  } else {
+      socket->Close ();
+  }
+}
+
+
+
 int main(int argc, char *argv[]) {
 
    /* Vypisu sa cmd line argumenty: ./waf --run "tema5 --PrintHelp" */
@@ -243,8 +290,6 @@ int main(int argc, char *argv[]) {
 // L1
 
    /*************** Zastavky ***************/
-
-
 
    NodeContainer nody_zastavky;
    nody_zastavky.Create(pocetZastavok);
@@ -276,41 +321,48 @@ int main(int argc, char *argv[]) {
      csma.SetChannelAttribute ("Delay", TimeValue (MilliSeconds (2)));
      vector<NetDeviceContainer> nic_zastavky_all = zastavkyCsmaSpojenia(csma);
 
-     // wi-fi channel - elektricky
-     YansWifiChannelHelper wChannel = YansWifiChannelHelper::Default ();
-     YansWifiPhyHelper phy;
-     phy.SetChannel (wChannel.Create ());
-     WifiHelper wifiHelper;
-     wifiHelper.SetRemoteStationManager ("ns3::AarfWifiManager");
-     Ssid ssid = Ssid ("imhd");
+      // wi-fi channel - elektricky
+      YansWifiChannelHelper wChannel = YansWifiChannelHelper::Default ();
+      YansWifiPhyHelper phy;
+      phy.SetChannel (wChannel.Create ());
 
-     // mac - elektricky
-     WifiMacHelper mac;
-     mac.SetType ("ns3::StaWifiMac", "Ssid", SsidValue (ssid), "ActiveProbing", BooleanValue (false));
-     NetDeviceContainer nic_elektricky;
-     nic_elektricky = wifiHelper.Install (phy, mac, nody_elektricky);
-     mac.SetType ("ns3::ApWifiMac", "Ssid", SsidValue (ssid));
-     NetDeviceContainer nicWap;
- //    nicWap = wifiHelper.Install (phy, mac, accessPoint); //budeme mat nejaky access point?
+      WifiHelper wifi;
+      wifi.SetRemoteStationManager ("ns3::AarfWifiManager");
+
+      // ad-hoc siet
+      WifiMacHelper mac;
+      mac.SetType ("ns3::AdhocWifiMac");
+      NetDeviceContainer nic_elektricky = wifi.Install (phy, mac, nody_elektricky);
 
 
- // L3 -- IP
-     InternetStackHelper stack;
-     stack.InstallAll();
-     Ipv4AddressHelper address;
+  // L3, L4 TCP/IP
 
-     // ZASTAVKY:
-     address.SetBase("10.2.1.0", "255.255.255.0"); // vytvorenie subnetu/podsiete s IP 10.2.1.0 a maskou 255.255.255.0
-     for (auto& nic_zastavky: nic_zastavky_all){
-         Ipv4InterfaceContainer zastavky_networkContainer = address.Assign(nic_zastavky);
-     }
+      InternetStackHelper internet;
+      internet.Install(nody_elektricky);
 
- //    // ELEKTRICKY:
-     address.SetBase("10.2.2.0", "255.255.255.0"); // subnet 10.2.2.0 maska 255.255.255.0
-     Ipv4InterfaceContainer elektricky_networkContainer = address.Assign(nic_elektricky);
+      // elektricky: subnet 10.1.1.0 maska 255.255.255.0
+      Ipv4AddressHelper ipv4;
+      ipv4.SetBase("10.1.1.0", "255.255.255.0");
+      auto interfaces_elektricky = ipv4.Assign(nic_elektricky);
 
- //    Ipv4GlobalRoutingHelper::PopulateRoutingTables (); // toto hadze error
 
+      //L5 - L7 aplikacna vrstva
+      Ipv4GlobalRoutingHelper::PopulateRoutingTables ();
+
+
+      /****** socket:  src = elektricka [0], recv = elektricka [1], broadcast allowed ******/
+
+       TypeId tid = TypeId::LookupByName ("ns3::UdpSocketFactory");
+       Ptr<Socket> recvSink = Socket::CreateSocket (nody_elektricky.Get (0), tid);
+       InetSocketAddress local = InetSocketAddress (Ipv4Address::GetAny (), 80);
+       recvSink->Bind (local);
+       recvSink->SetRecvCallback (MakeCallback (&ReceivePacket));
+
+       Ptr<Socket> source = Socket::CreateSocket (nody_elektricky.Get (1), tid);
+       InetSocketAddress remote = InetSocketAddress (Ipv4Address ("255.255.255.255"), 80);
+       source->SetAllowBroadcast (true);
+       source->Connect (remote);
+       Simulator::ScheduleWithContext (source->GetNode()->GetId(), Seconds (1.0), &GenerateTraffic, source, velkostUdajov, 200, Seconds(0.5));
 
  //L4 - L7 aplikacna vrstva
 
