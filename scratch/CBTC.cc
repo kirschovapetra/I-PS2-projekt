@@ -115,6 +115,7 @@ vector<Vector> CBTC::pozicieZastavok = { Vector(0.0, 0.0, 0.0),        //A
 
                                          Vector(500.0, 100.0, 0.0) };  //J
 
+
 CBTC::CBTC() {
   // CMD line argumenty
   pocetZastavok = 10;
@@ -125,7 +126,9 @@ CBTC::CBTC() {
   //  logging = true;
 }
 
+
 CBTC::~CBTC() {}
+
 
 /********************************** Spustenie ************************************/
 
@@ -138,6 +141,12 @@ void CBTC::Run() {
   ZastavkyConstantPositionModel(mobility);
   ElektrickyWaypointModel(mobility);
 
+  for (int i = 0; i < nodyElektricky.GetN(); i++) {
+        Ptr<WaypointMobilityModel> model = DynamicCast<WaypointMobilityModel>(nodyElektricky.Get(i)->GetObject<MobilityModel>());
+        // Schedulovanie zastavok pre jednotilve elektricky
+        Simulator::Schedule (stopLength + Seconds( + interval + (i * delay)), &ScheduleNextStop, model, tramPositions, i, Seconds(interval), stopLength);
+  }
+
 // L2
   SetCsmaDevices();
   NetDeviceContainer nicElektricky = SetWifiDevices();
@@ -147,7 +156,7 @@ void CBTC::Run() {
   SetApplications();
 
   // callback
-  Config::Connect ("/NodeList/*/$ns3::MobilityModel/CourseChange", MakeBoundCallback (&CourseChange, tramPositions, waypoints));
+  Config::Connect ("/NodeList/*/$ns3::MobilityModel/CourseChange", MakeCallback (&CourseChange));
 
   // animacia
   // TODO vygeneruje subor aj vykresli elektricky, ale nehybu sa :((
@@ -178,23 +187,15 @@ void CBTC::Run() {
 
 }
 
+
 /************************************* Ping ***************************************/
 
-void CBTC::VytvorSocketyMedziElektrickami(){
-
-  int n = nodyElektricky.GetN()-1;
-
-  for (int i=0; i<n; i++){
-
-      uint16_t port = 80 - i;
-      //cout << "server: " << i << " klient: " << i+1 << " port: " << port << " adress: "
-      //string adress = "255.255.255.255";
-      //uint32_t socketAdress = "255.255.255.255";// (uint32_t) atoi ("255.255.255.255"); //+ std::to_string(255); // p
-      //cout << socketAdress;
+void CBTC::VytvorSocketyMedziElektrickami (){
+  for (int i = 0, port = 80; i < nodyElektricky.GetN () - 1; i++, port--) {
 
       TypeId tid = TypeId::LookupByName ("ns3::UdpSocketFactory");
 
-      Ptr<Socket> recvSink = Socket::CreateSocket (nodyElektricky.Get (i+1), tid);
+      Ptr<Socket> recvSink = Socket::CreateSocket (nodyElektricky.Get (i + 1), tid);
       InetSocketAddress local = InetSocketAddress (Ipv4Address::GetAny (), port);
       recvSink->Bind (local);
       recvSink->SetRecvCallback (MakeCallback (&ReceivePacket));
@@ -204,44 +205,36 @@ void CBTC::VytvorSocketyMedziElektrickami(){
       source->SetAllowBroadcast (true);
       source->Connect (remote);
 
-      sockety[i] = source;
-
-
+      sockets.push_back(source);
   }
 
-//    TypeId tid = TypeId::LookupByName ("ns3::UdpSocketFactory");
-//
-//
-//    Ptr<Socket>  srcSocket = Socket::CreateSocket (nodyElektricky.Get (1), tid);
-//    srcSocket->SetAllowBroadcast (true);
-//    srcSocket->Connect (InetSocketAddress (Ipv4Address (socketAdresses[1]), 80));
-//
-//    Ptr<Socket> recSocket = Socket::CreateSocket (nodyElektricky.Get (0), tid);
-//    recSocket->Bind (InetSocketAddress (Ipv4Address::GetAny (), 80));
-//    recSocket->SetRecvCallback (MakeCallback (&ReceivePacket));
-//
-//  // source posle,receiver dostane
-//  Simulator::ScheduleWithContext (srcSocket->GetNode()->GetId(), Seconds (1.0), &GenerateTraffic, srcSocket, velkostUdajov, 200, Seconds(0.5));
-
-
+  //    TypeId tid = TypeId::LookupByName ("ns3::UdpSocketFactory");
+  //
+  //
+  //    Ptr<Socket>  srcSocket = Socket::CreateSocket (nodyElektricky.Get (1), tid);
+  //    srcSocket->SetAllowBroadcast (true);
+  //    srcSocket->Connect (InetSocketAddress (Ipv4Address (socketAdresses[1]), 80));
+  //
+  //    Ptr<Socket> recSocket = Socket::CreateSocket (nodyElektricky.Get (0), tid);
+  //    recSocket->Bind (InetSocketAddress (Ipv4Address::GetAny (), 80));
+  //    recSocket->SetRecvCallback (MakeCallback (&ReceivePacket));
+  //
+  //  // source posle,receiver dostane
+  //  Simulator::ScheduleWithContext (srcSocket->GetNode()->GetId(), Seconds (1.0), &GenerateTraffic, srcSocket, velkostUdajov, 200, Seconds(0.5));
 
 }
 
+
 void CBTC::PingniZoSource(Ptr<Socket> source, Time time) {
-  if(source == NULL){
+  if(!source){
       NS_LOG_ERROR("Source is null");
       return;
   }
 
-//  cout << "dadsa" << source->GetNode()->GetId() << endl;
+//  cout << source->GetNode()->GetId() << endl;
 
-  Simulator::ScheduleWithContext (source->GetNode()->GetId(),
-                                  time,
-                                  &GenerateTraffic,
-                                  source,
-                                  velkostUdajov,
-                                  5,
-                                  Seconds(1.0));
+  Simulator::ScheduleWithContext (source->GetNode ()->GetId (), time, &GenerateTraffic,
+                                  source, velkostUdajov, 5, Seconds (1.0));
 }
 
 
@@ -271,7 +264,6 @@ void CBTC::CreateNodes() {
   nodyElektricky.Create(pocetElektriciek);
   for (int i = 0; i < pocetElektriciek; i++)
       Names::Add (to_string(i+1), nodyElektricky.Get(i));
-
 }
 
 
@@ -285,7 +277,6 @@ void CBTC::ZastavkyConstantPositionModel(MobilityHelper &mobility) {
   mobility.SetMobilityModel("ns3::ConstantPositionMobilityModel");
   mobility.SetPositionAllocator(pozicieZastavokAlloc);
   mobility.Install(nodyZastavky);
-
 }
 
 
@@ -309,25 +300,39 @@ void CBTC::ElektrickyWaypointModel(MobilityHelper &mobility) {
 
   for (int i = 0; i < pocetElektriciek; i++) {
 
-      tramPositions.insert(pair<int, int>(i + 10, 0));
-      Ptr<WaypointMobilityModel> model = DynamicCast<WaypointMobilityModel>( nodyElektricky.Get(i)->GetObject<MobilityModel>() );
+//      cout << "-- ELEKTRICKA" << i << " --" << endl;
+      tramPositions.insert(pair<int, int>(i, 1));
+      Ptr<WaypointMobilityModel> model = DynamicCast<WaypointMobilityModel> (
+          nodyElektricky.Get (i)->GetObject<MobilityModel> ());
 
       auto cas = aktualnyCas + Seconds(interval * 0 + i * delay);
       auto pozicia = pozicieZastavok[cesta[0]];
       model->AddWaypoint (Waypoint(cas,pozicia));
-      waypoints[i + 10].push(cesta[0]);
 
-      for (int j = 1; j < cesta.size(); j++) {
+      for (int j = 1; j < 2; j++) {
           auto cas = aktualnyCas + Seconds(interval * j + i * delay);
           auto pozicia = pozicieZastavok[cesta[j]];
 
 //          cout << "zastavka: " << cesta[j] << " cas: " << cas  << endl;
           model->AddWaypoint (Waypoint(cas,pozicia));
-          model->AddWaypoint (Waypoint(cas + Seconds(2),pozicia));
-          waypoints[i + 10].push(cesta[j]);
-          waypoints[i + 10].push(cesta[j]);
-
+          model->AddWaypoint (Waypoint(cas + Seconds(2), pozicia));
       }
+  }
+}
+
+void CBTC::GenerateTraffic (Ptr<Socket> socket, uint32_t pktSize, uint32_t pktCount, Time pktInterval ) {
+  Ptr<Ipv4> ipv4 = socket -> GetNode() -> GetObject<Ipv4> ();
+  Ipv4InterfaceAddress iaddr = ipv4->GetAddress (1,0);
+
+  ostringstream msg; msg << "Hello World from " << iaddr.GetLocal() << '\0';
+
+  if (pktCount > 0) {
+      uint16_t packetSize = msg.str().length()+1;
+      Ptr<Packet> packet = Create<Packet>((uint8_t*) msg.str().c_str(), packetSize);
+      socket->Send (packet);
+      Simulator::Schedule (pktInterval, &GenerateTraffic, socket, pktSize, pktCount - 1, pktInterval);
+  } else {
+      socket->Close ();
   }
 }
 
@@ -388,63 +393,35 @@ void CBTC::SetRouting(NetDeviceContainer nicElektricky) {
 
 void CBTC::SetApplications() {
 
-
   VytvorSocketyMedziElektrickami();
 
-//  cout << "prvy " << sockety[0] << "druhy " << sockety[1];
+//  kontrolovanie vzdialenosti medzi elektrickami
+//  Simulator::Schedule (Seconds(1), &CheckDistances, nodyElektricky);
+
+//  cout << "prvy " << sockets[0] << "druhy " << sockets[1];
 
   // ping z prvej elektricky
-  PingniZoSource(sockety[0], Seconds(5.0));
+  PingniZoSource(sockets[0], Seconds(5.0));
 
   // ping z druhej elektricky
-  PingniZoSource(sockety[1], Seconds(10.0));
-
+  PingniZoSource(sockets[1], Seconds(10.0));
 }
+
 
 /********************************** Callbacky *************************************/
 
-void CBTC::CourseChange (map<int, int> tramPositions, map<int, stack<int>> waypoints, string context, Ptr<const MobilityModel> model) {
+void CBTC::CourseChange (string context, Ptr<const MobilityModel> model) {
 
-  Vector pos = model->GetPosition();
-  Ptr<Node> elektricka = GetNodeFromContext (context);
-  Ptr<WaypointMobilityModel> waypointModel = DynamicCast<WaypointMobilityModel> (elektricka->GetObject<MobilityModel> ());
-
-  int id_elektricky = elektricka->GetId () - 10; // elektricky maju v mobility modeli idcka 10,11,12 preto id-10
-  waypoints[id_elektricky + 10].pop ();
-
-  if (waypoints[id_elektricky + 10].size () == 1) {
-
-      int tramPositionIndex = tramPositions.at (id_elektricky + 10) + 1;
-      int nexStop;
-      cout << id_elektricky << endl;
-
-      if (tramPositionIndex == cesta.size () - 1) {
-        tramPositions.find (id_elektricky + 10)->second = 0;
-        nexStop = 1;
-      } else {
-        tramPositions.find (id_elektricky + 10)->second = tramPositionIndex;
-        nexStop = tramPositionIndex + 1;
-      }
-      auto previousWait = Seconds(2);
-      aktualnyCas = Simulator::Now () + Seconds (interval) +  previousWait; // posunie sa cas, ten previousWait by mal byt z predchadzajuces zastavky
-
-      cout << "current position " << waypointModel->GetPosition () << endl;
-      cout << "next position " << pozicieZastavok[cesta[nexStop]] << endl;
-
-      auto pozicia = pozicieZastavok[cesta[nexStop]];
-      waypointModel->AddWaypoint (Waypoint (aktualnyCas, pozicia));
-      waypoints[id_elektricky + 10].push (cesta[nexStop]);
-
-      waypointModel->AddWaypoint (Waypoint (aktualnyCas + previousWait, pozicia));
-      waypoints[id_elektricky + 10].push (cesta[nexStop]);
+  //  cout << elektricka->GetId() << ": " << waypointMobModel->WaypointsLeft() << endl;
+  //  cout << Simulator::Now ()<< ", x=" << pos.x << ", y=" << pos.y << ", z=" << pos.z << std::endl;
 
 
-    }
+  /*Vector pos = model->GetPosition ();
+  Ptr<Node> elektricka = GetNodeFromContext(context);
+  Ptr<WaypointMobilityModel> waypointModel = DynamicCast<WaypointMobilityModel>(elektricka->GetObject<MobilityModel>());
 
-  //ked presiel vsetkymi waypointmi, pridaju sa mu znova
-  /*if (waypoints.empty()) {
-
-      cout << "rest" << endl;
+  // ked presiel vsetkymi waypointmi, pridaju sa mu znova
+  if (waypointModel->WaypointsLeft() == 0) {
 
       int id_elektricky = elektricka->GetId() - 10;  // elektricky maju v mobility modeli idcka 10,11,12 preto id-10
 
@@ -456,7 +433,24 @@ void CBTC::CourseChange (map<int, int> tramPositions, map<int, stack<int>> waypo
           auto pozicia = pozicieZastavok[cesta[j]];
           waypointModel->AddWaypoint (Waypoint(cas,pozicia));
       }
-   }*/
+
+    }*/
+}
+
+
+void CBTC::CheckDistances (NodeContainer nodyElektricky){
+
+  for (int i = 0; i < nodyElektricky.GetN () - 1; i++){
+      Ptr<WaypointMobilityModel> model = DynamicCast<WaypointMobilityModel> (
+          nodyElektricky.Get (i)->GetObject<MobilityModel> ());
+      Ptr<WaypointMobilityModel> nextModel = DynamicCast<WaypointMobilityModel> (
+          nodyElektricky.Get (i + 1)->GetObject<MobilityModel> ());
+
+      cout << "ELEKTRICKA #" << i << " ---|" << model->GetDistanceFrom (nextModel)
+           << "|--- " << "ELEKTRICKA #" << (i + 1) << endl;
+  }
+
+  Simulator::Schedule (Seconds (2), &CheckDistances, nodyElektricky);
 }
 
 
@@ -464,9 +458,7 @@ void ReceivePacket (Ptr<Socket> socket) {
 
   while (Ptr<Packet> packet = socket->Recv()){
 
-
       cout << "\nping z " << socket -> GetNode() -> GetId() - 10 << " elektricky" << endl;
-
 
       int packetSize = packet->GetSize();
       uint8_t *buffer = new uint8_t[packetSize];
@@ -483,23 +475,25 @@ void ReceivePacket (Ptr<Socket> socket) {
 }
 
 
-void CBTC::GenerateTraffic (Ptr<Socket> socket, uint32_t pktSize, uint32_t pktCount, Time pktInterval) {
+void CBTC::ScheduleNextStop (Ptr<WaypointMobilityModel> model, map<int, int> tramPositions, int id, Time interval, Time stopLength){
 
-  Ptr<Ipv4> ipv4 = socket -> GetNode() -> GetObject<Ipv4> ();
-  Ipv4InterfaceAddress iaddr = ipv4->GetAddress (1,0);
+  int nextStop = tramPositions.at (id) + 1;
 
-  ostringstream msg; msg << "Hello World from " << iaddr.GetLocal() << '\0';
-
-//  cout << socket->GetNode()->GetId() << endl;
-
-  if (pktCount > 0) {
-      uint16_t packetSize = msg.str().length()+1;
-      Ptr<Packet> packet = Create<Packet>((uint8_t*) msg.str().c_str(), packetSize);
-      socket->Send (packet);
-      Simulator::Schedule (pktInterval, &GenerateTraffic, socket, pktSize, pktCount - 1, pktInterval);
+  if (nextStop == cesta.size () - 1){
+      tramPositions.find (id)->second = 0;
+      nextStop = 0;
   } else {
-      socket->Close ();
+      tramPositions.find (id)->second = nextStop;
   }
+
+  cout << "ELEKTRICKA #" << id << " next stop -> " << nextStop << endl;
+  auto pozicia = pozicieZastavok[cesta[nextStop]];
+  // dalsia zastavka
+  model->AddWaypoint (Waypoint (Simulator::Now () + interval, pozicia));
+  // dalsia zastavka druhykrat -> aby elektricka stala
+  model->AddWaypoint (Waypoint (Simulator::Now () + stopLength + interval, pozicia));
+  // naschedulovanie dalsej zastavky
+  Simulator::Schedule (stopLength + interval, &ScheduleNextStop, model, tramPositions, id, interval, stopLength);
 }
 
 
@@ -548,5 +542,3 @@ int main(int argc, char **argv) {
 
   return 0;
 }
-
-
