@@ -83,6 +83,7 @@ public:
   static void CheckDistances (NodeContainer nodyElektricky);
   static void CourseChange (string context, Ptr<const MobilityModel> model);
   static void GenerateTraffic (Ptr<Socket> socket, uint32_t pktSize, uint32_t pktCount, Time pktInterval);
+  static void ReceivePacket (Ptr<Socket> socket);
 
   // ping
   void VytvorSocketyMedziElektrickami ();

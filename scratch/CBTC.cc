@@ -320,22 +320,6 @@ void CBTC::ElektrickyWaypointModel(MobilityHelper &mobility) {
   }
 }
 
-void CBTC::GenerateTraffic (Ptr<Socket> socket, uint32_t pktSize, uint32_t pktCount, Time pktInterval ) {
-  Ptr<Ipv4> ipv4 = socket -> GetNode() -> GetObject<Ipv4> ();
-  Ipv4InterfaceAddress iaddr = ipv4->GetAddress (1,0);
-
-  ostringstream msg; msg << "Hello World from " << iaddr.GetLocal() << '\0';
-
-  if (pktCount > 0) {
-      uint16_t packetSize = msg.str().length()+1;
-      Ptr<Packet> packet = Create<Packet>((uint8_t*) msg.str().c_str(), packetSize);
-      socket->Send (packet);
-      Simulator::Schedule (pktInterval, &GenerateTraffic, socket, pktSize, pktCount - 1, pktInterval);
-  } else {
-      socket->Close ();
-  }
-}
-
 
 void CBTC::SetCsmaDevices() {
 
@@ -454,7 +438,7 @@ void CBTC::CheckDistances (NodeContainer nodyElektricky){
 }
 
 
-void ReceivePacket (Ptr<Socket> socket) {
+void CBTC::ReceivePacket (Ptr<Socket> socket) {
 
   while (Ptr<Packet> packet = socket->Recv()){
 
@@ -472,6 +456,23 @@ void ReceivePacket (Ptr<Socket> socket) {
       cout<< "Receiver: " << iaddr.GetLocal() << endl;
       cout<< "Received:" << packetContent << endl << endl;
     }
+}
+
+
+void CBTC::GenerateTraffic (Ptr<Socket> socket, uint32_t pktSize, uint32_t pktCount, Time pktInterval ) {
+  Ptr<Ipv4> ipv4 = socket -> GetNode() -> GetObject<Ipv4> ();
+  Ipv4InterfaceAddress iaddr = ipv4->GetAddress (1,0);
+
+  ostringstream msg; msg << "Hello World from " << iaddr.GetLocal() << '\0';
+
+  if (pktCount > 0) {
+      uint16_t packetSize = msg.str().length()+1;
+      Ptr<Packet> packet = Create<Packet>((uint8_t*) msg.str().c_str(), packetSize);
+      socket->Send (packet);
+      Simulator::Schedule (pktInterval, &GenerateTraffic, socket, pktSize, pktCount - 1, pktInterval);
+  } else {
+      socket->Close ();
+  }
 }
 
 
