@@ -238,7 +238,6 @@ static void CourseChange (std::string context, Ptr<const MobilityModel> model) {
 }
 
 
-
 void ReceivePacket (Ptr<Socket> socket) {
 
   while (Ptr<Packet> packet = socket->Recv()){
@@ -273,6 +272,56 @@ static void GenerateTraffic (Ptr<Socket> socket, uint32_t pktSize, uint32_t pktC
   }
 }
 
+
+
+void vytvorSocketyMedziElektrickami(NodeContainer nody_elektricky, Ptr<Socket> sockety[]){
+
+  int n = nody_elektricky.GetN()-1;
+
+  const char *socketAdresses[2];
+  socketAdresses[0] = "255.255.255.255";
+  socketAdresses[1] = "255.255.255.254";
+
+  for (int i=0; i<n; i++){
+      uint16_t port = 80 - i;
+      //cout << "server: " << i << " klient: " << i+1 << " port: " << port << " adress: "
+      //string adress = "255.255.255.255";
+      //uint32_t socketAdress = "255.255.255.255";// (uint32_t) atoi ("255.255.255.255"); //+ std::to_string(255); // p
+      //cout << socketAdress;
+
+      TypeId tid = TypeId::LookupByName ("ns3::UdpSocketFactory");
+      Ptr<Socket> recvSink = Socket::CreateSocket (nody_elektricky.Get (i+1), tid);
+      InetSocketAddress local = InetSocketAddress (Ipv4Address::GetAny (), port);
+      recvSink->Bind (local);
+      recvSink->SetRecvCallback (MakeCallback (&ReceivePacket));
+
+      Ptr<Socket> source = Socket::CreateSocket (nody_elektricky.Get (i), tid);
+      InetSocketAddress remote = InetSocketAddress (Ipv4Address (socketAdresses[i]), port);
+      source->SetAllowBroadcast (true);
+      source->Connect (remote);
+
+      sockety[i] = source;
+  }
+
+
+}
+
+void pingniZoSource(Ptr<Socket> source) {
+  if(source == NULL){
+      NS_LOG_ERROR("Source is null");
+      return;
+  }
+
+  cout << "dadsa" << source->GetNode()->GetId();
+
+  Simulator::ScheduleWithContext (source->GetNode()->GetId(),
+                                  Seconds (1.0),
+                                  &GenerateTraffic,
+                                  source,
+                                  velkostUdajov,
+                                  200,
+                                  Seconds(0.5));
+}
 
 
 int main(int argc, char *argv[]) {
@@ -345,24 +394,45 @@ int main(int argc, char *argv[]) {
       ipv4.SetBase("10.1.1.0", "255.255.255.0");
       auto interfaces_elektricky = ipv4.Assign(nic_elektricky);
 
-
-      //L5 - L7 aplikacna vrstva
       Ipv4GlobalRoutingHelper::PopulateRoutingTables ();
 
+      //L5 - L7 aplikacna vrstva
+
+
+      Ptr<Socket> sockety[2];
+
+      vytvorSocketyMedziElektrickami(nody_elektricky, sockety);
+
+     // cout << "prvy " << sockety[0] << "druhy " << sockety[1];
+
+      // ping z prvej elektricky
+      cout << "ping z prvej elektricky";
+      pingniZoSource(sockety[0]);
+
+      // ping z druhej elektricky
+      cout << "ping z druhej elektricky";
+      pingniZoSource(sockety[1]);
+
+
+
+      //Simulator::ScheduleWithContext (sockety[1]->GetNode()->GetId(), Seconds (1.0), &GenerateTraffic, sockety[1], velkostUdajov, 200, Seconds(0.5));
 
       /****** socket:  src = elektricka [0], recv = elektricka [1], broadcast allowed ******/
 
-       TypeId tid = TypeId::LookupByName ("ns3::UdpSocketFactory");
-       Ptr<Socket> recvSink = Socket::CreateSocket (nody_elektricky.Get (0), tid);
+     /*  TypeId tid = TypeId::LookupByName ("ns3::UdpSocketFactory");
+       Ptr<Socket> recvSink = Socket::CreateSocket (nody_elektricky.Get (1), tid);
        InetSocketAddress local = InetSocketAddress (Ipv4Address::GetAny (), 80);
        recvSink->Bind (local);
        recvSink->SetRecvCallback (MakeCallback (&ReceivePacket));
 
-       Ptr<Socket> source = Socket::CreateSocket (nody_elektricky.Get (1), tid);
+       Ptr<Socket> source = Socket::CreateSocket (nody_elektricky.Get (0), tid);
        InetSocketAddress remote = InetSocketAddress (Ipv4Address ("255.255.255.255"), 80);
        source->SetAllowBroadcast (true);
        source->Connect (remote);
+
        Simulator::ScheduleWithContext (source->GetNode()->GetId(), Seconds (1.0), &GenerateTraffic, source, velkostUdajov, 200, Seconds(0.5));
+
+*/
 
  //L4 - L7 aplikacna vrstva
 
