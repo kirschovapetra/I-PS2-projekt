@@ -23,7 +23,7 @@
 using namespace ns3;
 using namespace std;
 
-// callbacky
+// callback
 void ReceivePacket (Ptr<Socket> socket);
 
 // other
@@ -39,23 +39,13 @@ public:
   ~CBTC();
 
   /*--------------------- ATTRIBUTES -----------------------*/
-  NodeContainer nodyZastavky, nodyElektricky;   // nody
-  Ptr<Socket> srcSocket, recSocket;             // sockety
-  MobilityHelper mobility;                      // mobility helper
-  vector<NetDeviceContainer> nicZastavky;       // CSMA zariadenia
-  NetDeviceContainer nicElektricky;             // WIFI zariadenia
-  Ipv4InterfaceContainer interfacesElektricky;  // WIFI interfaces
-  const InetSocketAddress remote = InetSocketAddress(Ipv4Address("255.255.255.255"), 80);
-  const InetSocketAddress local = InetSocketAddress(Ipv4Address::GetAny (), 80);
 
-
-  map<int, int> tramPositions;
-  map<int, stack<int>> waypoints;
+  // nody
+  NodeContainer nodyZastavky, nodyElektricky;
 
   // CMD line argumenty
   uint32_t pocetZastavok, pocetElektriciek, velkostUdajov, trvanieSimulacie;
   bool ulozAnimaciu/*, logging*/;
-
 
   // pohyb elektriciek
   static double interval, delay;
@@ -63,29 +53,33 @@ public:
   static vector<int> cesta;
   static vector<string> nazvyZastavok;
   static vector<Vector> pozicieZastavok;
-
-
-
+  map<int, int> tramPositions;
+  map<int, stack<int>> waypoints;
+  Ptr<Socket> sockety[2];
   /*--------------------- METHODS -----------------------*/
 
-  void Run(); // spustenie programu
+  // spustenie programu
+  void Run();
 
   // Config
   void SetCommandLineArgs (int argc, char **argv);
-  void CreateNodes();                   // L1
-  void elektrickyWaypointModel();       // L1
-  void zastavkyConstantPositionModel(); // L1
-  void SetCsmaDevices();                // L2
-  void SetWifiDevices();                // L2
-  void SetRouting();                    // L3
-  void SetApplications();               // L4-L7
 
-  void GenerateAnimation();
+  void CreateNodes();                                             // L1
+  void ElektrickyWaypointModel(MobilityHelper &mobility);         // L1
+  void ZastavkyConstantPositionModel(MobilityHelper &mobility);   // L1
+  void SetCsmaDevices();                                          // L2
+  NetDeviceContainer SetWifiDevices();                            // L2
+  void SetRouting(NetDeviceContainer nicElektricky);              // L3
+  void SetApplications();                                         // L4-L7
   static void Stop(Ptr<Node> elektricka);
 
   // callback
   static void CourseChange (map<int, int> tramPositions, map<int, stack<int>> waypoints,string context, Ptr<const MobilityModel> model);
   static void GenerateTraffic (Ptr<Socket> socket, uint32_t pktSize, uint32_t pktCount, Time pktInterval);
+
+  // ping
+  void VytvorSocketyMedziElektrickami();
+  void PingniZoSource(Ptr<Socket> source, Time time);
 };
 
 #endif

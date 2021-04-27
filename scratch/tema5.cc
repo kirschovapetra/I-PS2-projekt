@@ -437,39 +437,6 @@ int main(int argc, char *argv[]) {
  //L4 - L7 aplikacna vrstva
 
 
-     // TODO asi radsej tcp - TCP lebo zarucuje ze sa spravy dorucia v poriadku
- //    UdpEchoServerHelper echoServer(9);
- //
- //    ApplicationContainer serverApps = echoServer.Install("PCs");
- //    serverApps.Start(Seconds(1.0));
- //    serverApps.Stop(Seconds(10.0));
- //
- //    // TODO ???
- //    Ptr <Node> src = nody_elektriciek.Get(0);// TODO
- //    Ptr <Node> dst = nody_zastavky.Get(pocetZastavok); // TODO
- //    UdpEchoClientHelper echoClient(nic_zastavky.GetAddress(pocetZastavok), 9);// TODO
- //    echoClient.SetAttribute("MaxPackets", UintegerValue(5)); // vstupny param?
- //    echoClient.SetAttribute("Interval", TimeValue(MilliSeconds(1000)));// vstupny param?
- //    echoClient.SetAttribute("PacketSize", UintegerValue(velkostUdajov));
- //
- //
- //    ApplicationContainer clientApps = echoClient.Install(src);
- //    clientApps.Start(Seconds(0.0));
- //    clientApps.Stop(Seconds(10.0));
- //    Simulator::Stop(Seconds(10.0));
- //
- //    LogComponentEnable("UdpEchoClientApplication", LOG_LEVEL_INFO);
- //    LogComponentEnable("UdpEchoServerApplication", LOG_LEVEL_INFO);
- //    csma.EnablePcap("ttt", nic_zastavky, true);
- //    wifi.EnablePcap("sss", nic_elektricky, true);
- //
- //    AnimationInterface aml("a.xml");
- //    aml.EnablePacketMetadata();
- //    aml.SetConstantPosition(src, 0, 0);
- //    aml.UpdateNodeDescription(src, "src");
- //    aml.UpdateNodeDescription(dst, "dst");
-
-
      Config::Connect ("/NodeList/*/$ns3::MobilityModel/CourseChange", MakeCallback (&CourseChange));
 
      Simulator::Stop (Seconds (trvanieSimulacie));
