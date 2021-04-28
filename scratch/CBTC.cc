@@ -52,18 +52,14 @@ HODNOTENIE:
 #include "CBTC.h"
 
 #include <ns3/address.h>
-#include <ns3/animation-interface.h>
 #include <ns3/assert.h>
 #include <ns3/boolean.h>
 #include <ns3/callback.h>
 #include <ns3/command-line.h>
 #include <ns3/config.h>
-#include <ns3/csma-helper.h>
 #include <ns3/event-id.h>
-#include <ns3/inet-socket-address.h>
 #include <ns3/internet-stack-helper.h>
 #include <ns3/ipv4.h>
-#include <ns3/ipv4-address.h>
 #include <ns3/ipv4-address-helper.h>
 #include <ns3/ipv4-global-routing-helper.h>
 #include <ns3/ipv4-interface-address.h>
@@ -73,11 +69,12 @@ HODNOTENIE:
 #include <ns3/nstime.h>
 #include <ns3/object.h>
 #include <ns3/packet.h>
+#include <ns3/point-to-point-helper.h>
 #include <ns3/position-allocator.h>
 #include <ns3/simulator.h>
+#include <ns3/trace-helper.h>
 #include <ns3/type-id.h>
 #include <ns3/waypoint.h>
-#include <ns3/waypoint-mobility-model.h>
 #include <ns3/wifi-helper.h>
 #include <ns3/wifi-mac-helper.h>
 #include <ns3/yans-wifi-helper.h>
@@ -121,7 +118,7 @@ CBTC::CBTC() {
   pocetZastavok = 10;
   pocetElektriciek = 3;
   velkostUdajov = 1024;
-  trvanieSimulacie = 200.0;
+  trvanieSimulacie = 1000.0;
   ulozAnimaciu = true;
   //  logging = true;
 }
@@ -136,7 +133,7 @@ void CBTC::Run() {
 
 // L1
   CreateNodes();
-
+  
   MobilityHelper mobility;
   ZastavkyConstantPositionModel(mobility);
   ElektrickyWaypointModel(mobility);
@@ -146,9 +143,9 @@ void CBTC::Run() {
         // Schedulovanie zastavok pre jednotilve elektricky
         Simulator::Schedule (stopLength + Seconds( + interval + (i * delay)), &ScheduleNextStop, model, tramPositions, i, Seconds(interval), stopLength);
   }
-
+  
 // L2
-  SetCsmaDevices();
+  SetP2PDevices();
   NetDeviceContainer nicElektricky = SetWifiDevices();
 // L3
   SetRouting(nicElektricky);
@@ -159,31 +156,34 @@ void CBTC::Run() {
   Config::Connect ("/NodeList/*/$ns3::MobilityModel/CourseChange", MakeCallback (&CourseChange));
 
   // animacia
-  // TODO vygeneruje subor aj vykresli elektricky, ale nehybu sa :((
-  // + nie su tam ciary medzi nodmi z nejakeho dovodu
   if (ulozAnimaciu) {
-      AnimationInterface anim("animacia_tema5.xml");
-      anim.EnablePacketMetadata();
 
-      for (uint32_t i = 0; i < pocetZastavok; ++i){
-          anim.UpdateNodeColor(nodyZastavky.Get(i),0,0,200);
-          anim.UpdateNodeDescription (nodyZastavky.Get(i), Names::FindName(nodyZastavky.Get(i)));
-          anim.UpdateNodeSize(nodyZastavky.Get(i)->GetId(),10,10);
-      }
+    AnimationInterface anim ("animations/CBTC_animacia.xml");
+    anim.EnablePacketMetadata();
 
-      for (uint32_t i = 1; i < pocetElektriciek; ++i){
-          anim.UpdateNodeColor(nodyElektricky.Get(i),0,200,0);
-          anim.UpdateNodeDescription (nodyElektricky.Get(i), Names::FindName(nodyElektricky.Get(i)));
-          anim.UpdateNodeSize(nodyElektricky.Get(i)->GetId(),10,10);
-      }
+    for (uint32_t i = 0; i < pocetZastavok; ++i){
+        anim.UpdateNodeColor(nodyZastavky.Get(i),0,0,200);
+        anim.UpdateNodeDescription (nodyZastavky.Get(i), Names::FindName(nodyZastavky.Get(i)));
+        anim.UpdateNodeSize(nodyZastavky.Get(i)->GetId(),10,10);
+    }
+
+    for (uint32_t i = 0; i < pocetElektriciek; ++i){
+        anim.UpdateNodeColor(nodyElektricky.Get(i),0,200,0);
+        anim.UpdateNodeDescription (nodyElektricky.Get(i), Names::FindName(nodyElektricky.Get(i)));
+        anim.UpdateNodeSize(nodyElektricky.Get(i)->GetId(),10,10);
+    }
+    cout << endl << "Animacia ulozena do animations/CBTC_animacia.xml" << endl;
+
+    Simulator::Stop(Seconds(trvanieSimulacie));
+    Simulator::Run ();
+    Simulator::Destroy ();
+
+  } else {
+
+      Simulator::Stop (Seconds (trvanieSimulacie));
+      Simulator::Run ();
+      Simulator::Destroy ();
   }
-
-//  Simulator::Schedule (Seconds(8.5), &Stop, nodyElektricky.Get(0)); // test zastavenia elektricky
-
-
-  Simulator::Stop (Seconds (trvanieSimulacie));
-  Simulator::Run();
-  Simulator::Destroy();
 
 }
 
@@ -292,11 +292,6 @@ void CBTC::ElektrickyWaypointModel(MobilityHelper &mobility) {
   }
   mobility.SetPositionAllocator(pozicieElektriciekAlloc);
 
-  /* waypoint model pre elektricky
-       * vsetky maju rovnaku cestu, iba maju posunute intervaly
-       * zastavuju na zastavkach
-       * TODO: treba aby si posielali spravy a podla toho spomalovali/zrychlovali
-  */
 
   for (int i = 0; i < pocetElektriciek; i++) {
 
@@ -321,26 +316,15 @@ void CBTC::ElektrickyWaypointModel(MobilityHelper &mobility) {
 }
 
 
-void CBTC::SetCsmaDevices() {
+void CBTC::SetP2PDevices() {
 
   // spojenia medzi dvojicami zastavok
-  vector<NodeContainer> spojenia = { NodeContainer(NodeContainer("A"),NodeContainer("B")),
-                                     NodeContainer(NodeContainer("B"),NodeContainer("C")),
-                                     NodeContainer(NodeContainer("C"),NodeContainer("D")),
-                                     NodeContainer(NodeContainer("C"),NodeContainer("F")),
-                                     NodeContainer(NodeContainer("D"),NodeContainer("F")),
-                                     NodeContainer(NodeContainer("D"),NodeContainer("H")),
-                                     NodeContainer(NodeContainer("F"),NodeContainer("E")),
-                                     NodeContainer(NodeContainer("F"),NodeContainer("G")),
-                                     NodeContainer(NodeContainer("F"),NodeContainer("H")),
-                                     NodeContainer(NodeContainer("G"),NodeContainer("H")),
-                                     NodeContainer(NodeContainer("G"),NodeContainer("J")),
-                                     NodeContainer(NodeContainer("H"),NodeContainer("I")) };
+  vector<vector<string>> spojenia = { {"A","B"}, {"B","C"}, {"C","D"}, {"C","F"}, {"D","F"}, {"D","H"},
+                                      {"F","E"}, {"F","G"}, {"F","H"}, {"G","H"}, {"G","J"}, {"H","I"} };
 
-  CsmaHelper csma;
-  // instalovanie net devices
-  for (const auto& spoj : spojenia)
-      csma.Install(spoj);
+  PointToPointHelper p2pHelper;
+  for (auto &spoj: spojenia)
+    p2pHelper.Install(spoj[0], spoj[1]);
 
 }
 
@@ -380,9 +364,7 @@ void CBTC::SetApplications() {
   VytvorSocketyMedziElektrickami();
 
 //  kontrolovanie vzdialenosti medzi elektrickami
-//  Simulator::Schedule (Seconds(1), &CheckDistances, nodyElektricky);
-
-//  cout << "prvy " << sockets[0] << "druhy " << sockets[1];
+  Simulator::Schedule (Seconds(1), &CheckDistances, nodyElektricky);
 
   // ping z prvej elektricky
   PingniZoSource(sockets[0], Seconds(5.0));

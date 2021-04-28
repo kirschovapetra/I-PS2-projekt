@@ -181,7 +181,7 @@ int main (int argc, char *argv[]) {
   csmaHelper.EnablePcap ("pcap/cv02-csma", csmaDevices.Get (0), true);
 
   // animacia
-  AnimationInterface a("cv02.xml");
+  AnimationInterface a("animations/cv02.xml");
   a.EnablePacketMetadata();
   a.UpdateNodeColor(destinationNode, 0, 0, 255);
   a.UpdateNodeDescription(destinationNode, "DST");

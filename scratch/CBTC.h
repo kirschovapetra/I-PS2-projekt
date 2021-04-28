@@ -71,10 +71,11 @@ public:
   void CreateNodes();                                             // L1
   void ElektrickyWaypointModel(MobilityHelper &mobility);         // L1
   void ZastavkyConstantPositionModel(MobilityHelper &mobility);   // L1
-  void SetCsmaDevices();                                          // L2
+  void SetP2PDevices();                                           // L2
   NetDeviceContainer SetWifiDevices();                            // L2
   void SetRouting(NetDeviceContainer nicElektricky);              // L3
   void SetApplications();                                         // L4-L7
+  AnimationInterface SaveAnimation(bool save);
   static void Stop(Ptr<Node> elektricka);
 
 
