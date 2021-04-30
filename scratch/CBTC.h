@@ -57,7 +57,7 @@ public:
   // zastavovanie
   static map<int, int> tramPositions;
 
-  // id , (interval, arrival time)
+  // id , arrival time
   static map<int, Time> timings;
   static map<int, bool > isStopped;
 

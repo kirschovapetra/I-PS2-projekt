@@ -512,7 +512,6 @@ void CBTC::Stop(Ptr<WaypointMobilityModel> waypointModel, int id) {
 
   waypointModel->EndMobility();
   waypointModel->AddWaypoint(Waypoint(Simulator::Now() + stopLength, pos));
-  cout << "next stop at" <<stopLength + timings[id] << endl;
   waypointModel->AddWaypoint(Waypoint(stopLength + timings[id], pozicieZastavok[cesta[tramPositions.at (id)]]));
 
   Simulator::Schedule (stopLength + (timings[id] - Simulator::Now()), &ScheduleNextStop, waypointModel, id);
@@ -548,8 +547,6 @@ Ptr <Node> GetNodeFromContext (string& context) {
 /************************************ Main ***************************************/
 
 int main(int argc, char **argv) {
-  //      model->AddWaypoint (Waypoint(cas + timings[i].second, pozicia));
-        //timings.find(i)-> second = make_pair(timings[i].first, cas);
   CBTC cbtcExperiment;
   cbtcExperiment.SetCommandLineArgs(argc, argv);
   cbtcExperiment.Run();
