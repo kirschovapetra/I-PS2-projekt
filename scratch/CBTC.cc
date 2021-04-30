@@ -92,6 +92,11 @@ NS_LOG_COMPONENT_DEFINE ("Tema 5: Simulacia dopravy – CBTC");
 double CBTC::interval = 5.0;
 double CBTC::delay = 3.0;
 Time CBTC::aktualnyCas = Seconds(0.0);
+Time CBTC::stopLength = Seconds(2.0);
+
+map<int, Time> CBTC::timings;
+map<int, bool > CBTC::isStopped;
+map<int, int> CBTC::tramPositions;
 
 //   cesta: A (0) -> B (1) -> C (2) -> D (3) -> H (7) -> I (8) -> H (7) -> G (6) ->
 //          J (9) -> G (6) -> F (5) -> E (4) -> F (5) -> C (2) -> B (1) -> A (0)
@@ -116,10 +121,10 @@ vector<Vector> CBTC::pozicieZastavok = { Vector(0.0, 0.0, 0.0),        //A
 CBTC::CBTC() {
   // CMD line argumenty
   pocetZastavok = 10;
-  pocetElektriciek = 3;
+  pocetElektriciek = 2;
   velkostUdajov = 1024;
   trvanieSimulacie = 1000.0;
-  ulozAnimaciu = true;
+  ulozAnimaciu = false;
   //  logging = true;
 }
 
@@ -135,15 +140,25 @@ void CBTC::Run() {
   CreateNodes();
   
   MobilityHelper mobility;
+
+
+  for (int i = 0; i < nodyElektricky.GetN(); i++) {
+      timings.insert({i, Seconds(5) + Seconds(i * delay)});
+      isStopped.insert({i, false});
+  }
+
   ZastavkyConstantPositionModel(mobility);
   ElektrickyWaypointModel(mobility);
 
   for (int i = 0; i < nodyElektricky.GetN(); i++) {
         Ptr<WaypointMobilityModel> model = DynamicCast<WaypointMobilityModel>(nodyElektricky.Get(i)->GetObject<MobilityModel>());
         // Schedulovanie zastavok pre jednotilve elektricky
-        Simulator::Schedule (stopLength + Seconds( + interval + (i * delay)), &ScheduleNextStop, model, tramPositions, i, Seconds(interval), stopLength);
+        Simulator::Schedule (timings[i], &ScheduleNextStop, model, i);
   }
   
+  Simulator::Schedule (Seconds(5), &Stop, DynamicCast<WaypointMobilityModel>(nodyElektricky.Get(1)->GetObject<MobilityModel>()), 1);
+  Simulator::Schedule (Seconds(23), &Stop, DynamicCast<WaypointMobilityModel>(nodyElektricky.Get(1)->GetObject<MobilityModel>()), 1);
+
 // L2
   SetP2PDevices();
   NetDeviceContainer nicElektricky = SetWifiDevices();
@@ -282,7 +297,7 @@ void CBTC::ZastavkyConstantPositionModel(MobilityHelper &mobility) {
 
 void CBTC::ElektrickyWaypointModel(MobilityHelper &mobility) {
 
-  mobility.SetMobilityModel("ns3::WaypointMobilityModel", "LazyNotify",BooleanValue(true));
+  mobility.SetMobilityModel("ns3::WaypointMobilityModel", "LazyNotify", BooleanValue(true));
   mobility.Install(nodyElektricky);
 
   // nastavenie pozicii do mobility modelu
@@ -290,8 +305,8 @@ void CBTC::ElektrickyWaypointModel(MobilityHelper &mobility) {
   for( int i = 0; i < pocetElektriciek; i++) {
       pozicieElektriciekAlloc -> Add(Vector(0.0, 0.0, 0.0));
   }
-  mobility.SetPositionAllocator(pozicieElektriciekAlloc);
 
+  mobility.SetPositionAllocator(pozicieElektriciekAlloc);
 
   for (int i = 0; i < pocetElektriciek; i++) {
 
@@ -300,18 +315,11 @@ void CBTC::ElektrickyWaypointModel(MobilityHelper &mobility) {
       Ptr<WaypointMobilityModel> model = DynamicCast<WaypointMobilityModel> (
           nodyElektricky.Get (i)->GetObject<MobilityModel> ());
 
-      auto cas = aktualnyCas + Seconds(interval * 0 + i * delay);
-      auto pozicia = pozicieZastavok[cesta[0]];
-      model->AddWaypoint (Waypoint(cas,pozicia));
+      //0. zastavka
+      model->AddWaypoint (Waypoint(Seconds(i * delay), pozicieZastavok[cesta[0]]));
 
-      for (int j = 1; j < 2; j++) {
-          auto cas = aktualnyCas + Seconds(interval * j + i * delay);
-          auto pozicia = pozicieZastavok[cesta[j]];
-
-//          cout << "zastavka: " << cesta[j] << " cas: " << cas  << endl;
-          model->AddWaypoint (Waypoint(cas,pozicia));
-          model->AddWaypoint (Waypoint(cas + Seconds(2), pozicia));
-      }
+      //1. zastavka
+      model->AddWaypoint (Waypoint(timings[i], pozicieZastavok[cesta[1]]));
   }
 }
 
@@ -364,7 +372,7 @@ void CBTC::SetApplications() {
   VytvorSocketyMedziElektrickami();
 
 //  kontrolovanie vzdialenosti medzi elektrickami
-  Simulator::Schedule (Seconds(1), &CheckDistances, nodyElektricky);
+  Simulator::Schedule (Seconds(5), &CheckDistances, nodyElektricky);
 
   // ping z prvej elektricky
   PingniZoSource(sockets[0], Seconds(5.0));
@@ -414,6 +422,13 @@ void CBTC::CheckDistances (NodeContainer nodyElektricky){
 
       cout << "ELEKTRICKA #" << i << " ---|" << model->GetDistanceFrom (nextModel)
            << "|--- " << "ELEKTRICKA #" << (i + 1) << endl;
+
+      if(model->GetDistanceFrom (nextModel) < 130.0){
+//          Stop(DynamicCast<WaypointMobilityModel>(nodyElektricky.Get(i + 1)->GetObject<MobilityModel>()), i + 1);
+//          Simulator::Schedule (Seconds (0.1), &Stop, );
+//          Simulator::Schedule (Seconds(5), &Stop, nextModel, i + 1);
+
+       }
   }
 
   Simulator::Schedule (Seconds (2), &CheckDistances, nodyElektricky);
@@ -458,34 +473,49 @@ void CBTC::GenerateTraffic (Ptr<Socket> socket, uint32_t pktSize, uint32_t pktCo
 }
 
 
-void CBTC::ScheduleNextStop (Ptr<WaypointMobilityModel> model, map<int, int> tramPositions, int id, Time interval, Time stopLength){
+void CBTC::ScheduleNextStop (Ptr<WaypointMobilityModel> model, int id){
 
-  int nextStop = tramPositions.at (id) + 1;
-
-  if (nextStop == cesta.size () - 1){
-      tramPositions.find (id)->second = 0;
-      nextStop = 0;
+  if (isStopped[id]){
+      isStopped.find (id) -> second = false;
   } else {
-      tramPositions.find (id)->second = nextStop;
-  }
+    int nextStop = tramPositions.at (id) + 1;
 
-  cout << "ELEKTRICKA #" << id << " next stop -> " << nextStop << endl;
-  auto pozicia = pozicieZastavok[cesta[nextStop]];
-  // dalsia zastavka
-  model->AddWaypoint (Waypoint (Simulator::Now () + interval, pozicia));
-  // dalsia zastavka druhykrat -> aby elektricka stala
-  model->AddWaypoint (Waypoint (Simulator::Now () + stopLength + interval, pozicia));
-  // naschedulovanie dalsej zastavky
-  Simulator::Schedule (stopLength + interval, &ScheduleNextStop, model, tramPositions, id, interval, stopLength);
+    if (nextStop == cesta.size () - 1){
+        tramPositions.find (id)->second = 0;
+        nextStop = 0;
+    } else {
+        tramPositions.find (id)->second = nextStop;
+    }
+
+    // nastavenie nahodnej rychlosti
+    Time randTime = Seconds(rand() % 11 + 5);
+    timings.find(id) -> second = Simulator::Now () + randTime + stopLength;
+
+    cout << "ELEKTRICKA #" << id << " next stop -> " << nextStop << endl;
+    Vector nextStopPostition = pozicieZastavok[cesta[nextStop]];
+    Vector currentStopPostition = pozicieZastavok[cesta[nextStop - 1]];
+
+    // statie
+    model->AddWaypoint (Waypoint (Simulator::Now () + stopLength, currentStopPostition));
+    // dalsia zastavka
+    model->AddWaypoint (Waypoint (timings[id], nextStopPostition));
+    // naschedulovanie dalsej zastavky
+    Simulator::Schedule (randTime + stopLength, &ScheduleNextStop, model, id);
+  }
 }
 
 
 // zastavenie elektricky
-void CBTC::Stop(Ptr<Node> elektricka) {
-  Ptr<WaypointMobilityModel> waypointModel = DynamicCast<WaypointMobilityModel> (elektricka->GetObject<MobilityModel> ());
-  auto pos = waypointModel->GetPosition();
+void CBTC::Stop(Ptr<WaypointMobilityModel> waypointModel, int id) {
+  isStopped.find(id)-> second = true;
+  Vector pos = waypointModel->GetPosition();
+
   waypointModel->EndMobility();
-  waypointModel->AddWaypoint(Waypoint(Simulator::Now(), pos));
+  waypointModel->AddWaypoint(Waypoint(Simulator::Now() + stopLength, pos));
+  cout << "next stop at" <<stopLength + timings[id] << endl;
+  waypointModel->AddWaypoint(Waypoint(stopLength + timings[id], pozicieZastavok[cesta[tramPositions.at (id)]]));
+
+  Simulator::Schedule (stopLength + (timings[id] - Simulator::Now()), &ScheduleNextStop, waypointModel, id);
 }
 
 
@@ -518,7 +548,8 @@ Ptr <Node> GetNodeFromContext (string& context) {
 /************************************ Main ***************************************/
 
 int main(int argc, char **argv) {
-
+  //      model->AddWaypoint (Waypoint(cas + timings[i].second, pozicia));
+        //timings.find(i)-> second = make_pair(timings[i].first, cas);
   CBTC cbtcExperiment;
   cbtcExperiment.SetCommandLineArgs(argc, argv);
   cbtcExperiment.Run();

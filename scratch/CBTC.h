@@ -50,15 +50,21 @@ public:
 
   // pohyb elektriciek
   static double interval, delay;
-  static Time aktualnyCas;
+  static Time aktualnyCas, stopLength;
   static vector<int> cesta;
   static vector<string> nazvyZastavok;
   static vector<Vector> pozicieZastavok;
   // zastavovanie
-  map<int, int> tramPositions;
-  Time stopLength = Seconds(2);
+  static map<int, int> tramPositions;
+
+  // id , (interval, arrival time)
+  static map<int, Time> timings;
+  static map<int, bool > isStopped;
 
   vector<Ptr<Socket>> sockets;
+
+
+  static Vector curpos;
 
   /*--------------------- METHODS -----------------------*/
 
@@ -76,11 +82,11 @@ public:
   void SetRouting(NetDeviceContainer nicElektricky);              // L3
   void SetApplications();                                         // L4-L7
   AnimationInterface SaveAnimation(bool save);
-  static void Stop(Ptr<Node> elektricka);
+  static void Stop(Ptr<WaypointMobilityModel> elektricka, int id);
 
 
   // callback
-  static void ScheduleNextStop (Ptr<WaypointMobilityModel> model, map<int, int> tramPositions, int id, Time interval, Time stopLength);
+  static void ScheduleNextStop (Ptr<WaypointMobilityModel> model, int id);
   static void CheckDistances (NodeContainer nodyElektricky);
   static void CourseChange (string context, Ptr<const MobilityModel> model);
   static void GenerateTraffic (Ptr<Socket> socket, uint32_t pktSize, uint32_t pktCount, Time pktInterval);
@@ -89,6 +95,10 @@ public:
   // ping
   void VytvorSocketyMedziElektrickami ();
   void PingniZoSource(Ptr<Socket> source, Time time);
+
+
+  //test
+  static void Reset(Ptr<WaypointMobilityModel> waypointModel);
 };
 
 #endif
