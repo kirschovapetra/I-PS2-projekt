@@ -49,6 +49,9 @@ public:
   uint32_t pocetZastavok, pocetElektriciek, velkostUdajov, trvanieSimulacie, protocol;
   bool ulozAnimaciu;
 
+  bool xxxx;
+
+
   // pohyb elektriciek
   static double interval, delay;
   static Time aktualnyCas, stopLength;
