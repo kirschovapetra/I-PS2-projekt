@@ -49,7 +49,6 @@ public:
   uint32_t pocetZastavok, pocetElektriciek, velkostUdajov, trvanieSimulacie, protocol;
   bool ulozAnimaciu;
 
-  bool xxxx;
 
 
   // pohyb elektriciek
@@ -64,9 +63,10 @@ public:
   // id , arrival time
   static map<int, Time> timings;
   static map<int, bool > isStopped;
+  static map<int, bool > resetStop;
+
 
   vector<Ptr<Socket>> sockets;
-
 
   static Vector curpos;
 
@@ -95,6 +95,7 @@ public:
 //  static void CourseChange (string context, Ptr<const MobilityModel> model);
   static void GenerateTraffic (Ptr<Socket> socket, uint32_t pktSize, Time pktInterval);
   static void ReceivePacket (Ptr<Socket> socket);
+  static void SetStop(int id);
 
   // ping
   void VytvorSocketyMedziElektrickami ();

@@ -104,6 +104,7 @@ Time CBTC::stopLength = Seconds(2.0);
 
 map<int, Time> CBTC::timings;
 map<int, bool > CBTC::isStopped;
+map<int, bool > CBTC::resetStop = {{0, true}, {1, true}};
 map<int, int> CBTC::tramPositions;
 
 //   cesta: A (0) -> B (1) -> C (2) -> D (3) -> H (7) -> I (8) -> J (9) -> G (6) -> F (5) -> E (4) -> A (0)
@@ -130,12 +131,11 @@ vector<Vector> CBTC::pozicieZastavok = { Vector(0.0, 0.0, 0.0),        //A
 CBTC::CBTC() {
   // CMD line argumenty
   pocetZastavok = 10;
-  pocetElektriciek = 2;
+  pocetElektriciek = 3;
   velkostUdajov = 50;
   trvanieSimulacie = 1000.0;
   ulozAnimaciu = true;
   protocol=1;
-  xxxx = false;
 }
 
 
@@ -160,7 +160,9 @@ void CBTC::Run(int argc, char **argv) {
 
 
 //  Simulator::Schedule (Seconds(5), &Stop, DynamicCast<WaypointMobilityModel>(nodyElektricky.Get(1)->GetObject<MobilityModel>()), 1);
-//  Simulator::Schedule (Seconds(23), &Stop, DynamicCast<WaypointMobilityModel>(nodyElektricky.Get(1)->GetObject<MobilityModel>()), 1);
+//  Simulator::Schedule (Seconds(18), &Stop, DynamicCast<WaypointMobilityModel>(nodyElektricky.Get(1)->GetObject<MobilityModel>()), 1);
+//  Simulator::Schedule (Seconds(25), &Stop, DynamicCast<WaypointMobilityModel>(nodyElektricky.Get(1)->GetObject<MobilityModel>()), 1);
+//  Simulator::Schedule (Seconds(30), &Stop, DynamicCast<WaypointMobilityModel>(nodyElektricky.Get(1)->GetObject<MobilityModel>()), 1);
 
 // L2
   SetP2PDevices();
@@ -318,6 +320,7 @@ void CBTC::ElektrickyWaypointModel(MobilityHelper &mobility) {
   for (int i = 0; i < pocetElektriciek; i++) {
       timings.insert({i, Seconds(5) + Seconds(i * delay)});
       isStopped.insert({i, false});
+      resetStop.insert({i, true});
   }
 
 
@@ -424,7 +427,7 @@ void CBTC::SetApplications() {
   PingniZoSource(sockets[0], Seconds(5.0));
 
   // ping z druhej elektricky
-//  PingniZoSource(sockets[1], Seconds(10.0));
+  PingniZoSource(sockets[1], Seconds(10.0));
 }
 
 
@@ -462,11 +465,11 @@ void CBTC::ReceivePacket (Ptr<Socket> socket) {
 
   while (Ptr<Packet> packet = socket->Recv()) {
 
-      xxxx = false;
       // elektricka zastavi
 
       Ptr<WaypointMobilityModel> waypointModel = DynamicCast<WaypointMobilityModel>(socketNode -> GetObject<MobilityModel>());
       Stop(waypointModel, socketNode -> GetId() - 10);
+
 
       // vypis paketu
       int packetSize = packet->GetSize();
@@ -527,11 +530,12 @@ void CBTC::ScheduleNextStop (Ptr<WaypointMobilityModel> model, int id){
 
     auto now = Simulator::Now () ;
 
+
     // nastavenie nahodnej rychlosti
     Time randTime = Seconds(rand() % 9 + 5);
     timings.find(id) -> second = now + randTime + stopLength;
 
-    cout << "ELEKTRICKA #" << id << " next stop -> " << nextStop << endl;
+//    cout << "ELEKTRICKA #" << id << " next stop -> " << nextStop << endl;
     Vector nextStopPostition = pozicieZastavok[cesta[nextStop]];
     Vector currentStopPostition = pozicieZastavok[cesta[nextStop - 1]];
 
@@ -544,21 +548,34 @@ void CBTC::ScheduleNextStop (Ptr<WaypointMobilityModel> model, int id){
   }
 }
 
+void CBTC::SetStop(int id){
+  cout << "STOP reset # " << id << endl;
+  resetStop.find(id)-> second = true;
+}
+
 // zastavenie elektricky
 void CBTC::Stop(Ptr<WaypointMobilityModel> waypointModel, int id) {
-  xxxx = false;
-  cout << "-- elektricka " << id << " ZASTAV --" << endl;
 
-  isStopped.find(id)-> second = true;
-  Vector pos = waypointModel->GetPosition();
 
   auto now = Simulator::Now();
 
-  waypointModel->EndMobility();
-  waypointModel->AddWaypoint(Waypoint(now + stopLength, pos));
-  waypointModel->AddWaypoint(Waypoint(stopLength + timings[id], pozicieZastavok[cesta[tramPositions.at (id)]]));
+  if (resetStop[id]){
 
-  Simulator::Schedule (stopLength + (timings[id] - now), &ScheduleNextStop, waypointModel, id);
+      cout << "-- elektricka " << id << " ZASTAV --" << endl;
+
+      Vector pos = waypointModel->GetPosition();
+      waypointModel->EndMobility();
+
+      isStopped.find(id)-> second = true;
+      resetStop.find(id)-> second = false;
+      waypointModel->AddWaypoint(Waypoint(now + stopLength, pos));
+      waypointModel->AddWaypoint(Waypoint(stopLength + timings[id], pozicieZastavok[cesta[tramPositions.at (id)]]));
+
+
+      Simulator::Schedule (stopLength + (timings[id] - now) + stopLength + Seconds(0.5), &SetStop, id);
+      Simulator::Schedule (stopLength + (timings[id] - now), &ScheduleNextStop, waypointModel, id);
+
+  }
 }
 
 
