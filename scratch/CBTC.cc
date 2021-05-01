@@ -509,14 +509,10 @@ void CBTC::Run(int argc = -1, char **argv = nullptr) {
   if (argc > 0)
     SetCommandLineArgs(argc, argv);
 
-
-//  packetIntervalTrace = 10;
-  // schedulovanie zmeny intervalu paketov po 15tich sekundach
-
   if (runtimeIntervalChange) {
       // odchytavanie udalosti – zmeny packetIntervalTrace
       TraceConnectWithoutContext ("packetIntervalTrace", MakeCallback (&PacketIntervalChanged));
-      // zmena intervalu posielania paketov
+      // zmena intervalu posielania paketov po 20 sekundach
       Simulator::Schedule (Seconds(20.0), &RewritePacketInterval, this);
   }
   else {
@@ -538,7 +534,7 @@ void CBTC::Run(int argc = -1, char **argv = nullptr) {
   SetRouting(nicElektricky);
 
   // L4-L7
-//  SetApplications();
+  SetApplications();
 
 
   // animacia

@@ -5,7 +5,6 @@
 #include <bits/stdint-uintn.h>
 #include <ns3/ipv4-interface-container.h>
 #include <ns3/net-device-container.h>
-#include <ns3/node.h>
 #include <ns3/node-container.h>
 #include <ns3/nstime.h>
 #include <ns3/ptr.h>
@@ -13,13 +12,10 @@
 #include <ns3/traced-value.h>
 #include <ns3/vector.h>
 #include <ns3/waypoint-mobility-model.h>
+#include <ns3/mobility-helper.h>
 #include <map>
 #include <string>
 #include <vector>
-
-namespace ns3 {
-class MobilityHelper;
-} /* namespace ns3 */
 
 using namespace ns3;
 using namespace std;
