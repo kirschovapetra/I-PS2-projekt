@@ -45,6 +45,7 @@ public:
   // pohyb elektriciek
   static double interval, delay;
   static Time stopLength;
+  static Time pauseLength;
   static vector<int> path;
   static vector<string> stopNames;
   static vector<Vector> stopPositions;
@@ -79,6 +80,10 @@ public:
   // posielanie paketov
   static void GenerateTraffic(Ptr<Socket> socket, uint32_t pktSize, Time pktInterval);
   static void ReceivePacket(Ptr<Socket> socket);
+
+//  // ping
+//   void VytvorSocketyMedziElektrickami ();
+//   void PingniZoSource(Ptr<Socket> source, Time time);
 
 };
 

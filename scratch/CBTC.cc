@@ -28,7 +28,7 @@ HODNOTENIE:
 
 2b Popis projektu (Hodnotí sa nápaditosť. Uprednostnite jednoduchosť a celistvosť)
 
-2b Popis vhodného výberu ISO OSI (V úvodnom komentári popíšte dôvody výberu jednotlivých protokolov)
+✔ 2b Popis vhodného výberu ISO OSI (V úvodnom komentári popíšte dôvody výberu jednotlivých protokolov)
 
 ✔ 1b použitie časových udalostí (záznam o zmene)
     - Simulator::Schedule
@@ -42,7 +42,7 @@ HODNOTENIE:
 ✔ 2b v čase simulácie zmena v modeli L1 fyzické médium, pohyb, útlm …
     - zmeni sa spravanie uzlu - mobility model
 
-3b v čase simulácie zmena v modelu L2-L5
+✔ 3b v čase simulácie zmena v modelu L2-L5
    - zmenim atribut nejakeho smerovacieho protokolu - kolko paketov posiela atd
    - zmena intervalu Hello Paketov
    - na transportnej/aplikacnej/spojovej vrstve
@@ -74,8 +74,8 @@ HODNOTENIE:
 #include <ns3/ipv4-interface-address.h>
 #include <ns3/log.h>
 #include <ns3/log-macros-disabled.h>
-#include <ns3/mobility-helper.h>
 #include <ns3/names.h>
+#include <ns3/node.h>
 #include <ns3/node-list.h>
 #include <ns3/object.h>
 #include <ns3/olsr-helper.h>
@@ -103,38 +103,37 @@ NS_LOG_COMPONENT_DEFINE ("Tema 5: Simulacia dopravy – CBTC");
 
 /************************** staticke premenne ******************************/
 
-double CBTC::interval = 7.0;
-double CBTC::delay = 2.0;
+double CBTC::interval = 5.0;
+double CBTC::delay = 3.0;
 Time CBTC::stopLength = Seconds(2.0);
+Time CBTC::pauseLength = Seconds(5.0);
+
 map<int, Time> CBTC::timings;
 map<int, bool > CBTC::isStopped;
-map<int, bool > CBTC::resetStop;
+map<int, bool > CBTC::resetStop = {{0, true}, {1, true}};
 map<int, int> CBTC::tramPositions;
 
-//   cesta: A (0) -> B (1) -> C (2) -> D (3) -> H (7) -> I (8) -> J (9) -> G (6) -> F (5) -> E (4) -> A (0)
+//   path: A (0) -> B (1) -> C (2) -> D (3) -> H (7) -> I (8) -> J (9) -> G (6) -> F (5) -> E (4) -> A (0)
 vector<int> CBTC::path = {0,1,2,5,7,8,9,4,0};
-vector<string> CBTC::stopNames = {"A", "B", "C", "D", "E", "F", "G", "H", "I", "J"};
+vector<string> CBTC::stopNames = {"A","B", "C", "D", "E", "F", "G", "H", "I", "J"};
 vector<Vector> CBTC::stopPositions = { Vector(0.0, 0.0, 0.0),        //A
-                                       Vector(0.0, 200.0, 0.0),      //B
+                                         Vector(0.0, 100.0, 0.0),      //B
 
-                                       Vector(100.0, 100.0, 0.0),    //C
-                                       Vector(100.0, 200.0, 0.0),    //D
+                                         Vector(100.0, 100.0, 0.0),    //C
+                                         Vector(100.0, 200.0, 0.0),    //D
 
-                                       Vector(200.0, 0.0, 0.0),      //E
-                                       Vector(200.0, 100.0, 0.0),    //F
+                                         Vector(200.0, 0.0, 0.0),      //E
+                                         Vector(200.0, 100.0, 0.0),    //F
 
-                                       Vector(300.0, 100.0, 0.0),    //G
-                                       Vector(300.0, 200.0, 0.0),    //H
-                                       Vector(400.0, 200.0, 0.0),    //I
+                                         Vector(300.0, 100.0, 0.0),    //G
+                                         Vector(300.0, 200.0, 0.0),    //H
+                                         Vector(400.0, 200.0, 0.0),    //I
 
-                                       Vector(400.0, 100.0, 0.0) };  //J
-
-
-/**********************************************************************************/
+                                         Vector(400.0, 100.0, 0.0) };  //J
 
 
 CBTC::CBTC(uint32_t tramsN = 3, uint32_t packetSize = 50, uint32_t totalTime = 1000, bool saveAnim = true,
-           uint32_t protocol = 1, uint32_t packetInterval = 6.0, bool runtimeIntervalChange = true) {
+           uint32_t protocol = 1, uint32_t packetInterval = 10, bool runtimeIntervalChange = true) {
   // CMD line argumenty
   this->tramsN = tramsN;
   this->packetSize = packetSize;
@@ -168,6 +167,129 @@ void PacketIntervalChanged (int32_t oldValue, int32_t newValue) {
 }
 
 void RewritePacketInterval(Ptr<CBTC> thisPtr) { thisPtr->packetIntervalTrace = thisPtr->packetInterval; }
+
+
+/********************************** Pakety *************************************/
+
+
+void CBTC::ReceivePacket (Ptr<Socket> socket) {
+
+
+  Ptr<Node> socketNode = socket -> GetNode();
+
+  while (Ptr<Packet> packet = socket->Recv()) {
+
+      // elektricka zastavi
+
+      Ptr<WaypointMobilityModel> waypointModel = DynamicCast<WaypointMobilityModel>(socketNode -> GetObject<MobilityModel>());
+      StopTramMovement(waypointModel, socketNode -> GetId() - 10);
+
+
+      // vypis paketu
+      int packSize = packet->GetSize();
+      uint8_t *buffer = new uint8_t[packSize];
+
+      int size = packet->CopyData(buffer, packSize);
+      string packetContent = string(buffer, buffer + packSize);
+      packetContent.resize(packetContent.find('\0')); // odstrani sa padding z paketu
+
+      Ptr<Ipv4> ipv4 = socketNode -> GetObject<Ipv4>();
+      Ipv4InterfaceAddress iaddr = ipv4->GetAddress (1,0);
+
+      NS_LOG_UNCOND("[INFO] " << Simulator::Now() << " | Receiver: " << iaddr.GetLocal() << " | "
+                                  << "Received ("<< size<< " B): " << packetContent << endl);
+
+    }
+}
+
+
+void CBTC::GenerateTraffic (Ptr<Socket> socket, uint32_t pktSize, Time pktInterval ) {
+  Ptr<Ipv4> ipv4 = socket -> GetNode() -> GetObject<Ipv4> ();
+  Ipv4InterfaceAddress iaddr = ipv4->GetAddress (1,0);
+
+  ostringstream msg; msg << "Hello World from " << iaddr.GetLocal() << '\0';
+
+  uint16_t messageLength = msg.str().length()+1;
+
+  Ptr<Packet> packet = Create<Packet>((uint8_t*) msg.str().c_str(), messageLength);
+  packet->AddPaddingAtEnd(pktSize - messageLength); // aby bol takej velkosti, ako pktSize
+  socket->Send (packet);
+  Simulator::Schedule (pktInterval, &GenerateTraffic, socket, pktSize, Seconds(2.0));
+
+}
+
+
+/****************************** Pohyb elektriciek ********************************/
+
+
+void CBTC::ScheduleNextStop (Ptr<WaypointMobilityModel> model, int id){
+
+  srand (time(NULL));
+
+  if (isStopped[id]){
+      isStopped.find (id) -> second = false;
+  }
+
+  else {
+    int nextStop = tramPositions.at (id) + 1;
+
+    if (nextStop == path.size () - 1){
+        tramPositions.find (id)->second = 0;
+        nextStop = 0;
+    } else {
+        tramPositions.find (id)->second = nextStop;
+    }
+
+    auto now = Simulator::Now () ;
+
+
+    // nastavenie nahodnej rychlosti
+    Time randTime = Seconds(rand() % 8 + 5);
+    timings.find(id) -> second = now + randTime + stopLength;
+
+//    cout << "ELEKTRICKA #" << id << " next stop -> " << nextStop << endl;
+    Vector nextStopPostition = stopPositions[path[nextStop]];
+    Vector currentStopPostition = stopPositions[path[nextStop - 1]];
+
+    // statie
+    model->AddWaypoint (Waypoint (now + stopLength, currentStopPostition));
+    // dalsia zastavka
+    model->AddWaypoint (Waypoint (timings[id], nextStopPostition));
+    // naschedulovanie dalsej zastavky
+    Simulator::Schedule (randTime + stopLength, &ScheduleNextStop, model, id);
+  }
+}
+
+
+void CBTC::SetStop(int id){
+  cout << "STOP reset # " << id << endl;
+  resetStop.find(id)-> second = true;
+}
+
+// zastavenie elektricky
+void CBTC::StopTramMovement(Ptr<WaypointMobilityModel> waypointModel, int id) {
+
+
+  auto now = Simulator::Now();
+
+  if (resetStop[id]){
+
+      cout << "-- elektricka " << id << " ZASTAV --" << endl;
+
+      Vector pos = waypointModel->GetPosition();
+      waypointModel->EndMobility();
+
+      isStopped.find(id)-> second = true;
+      resetStop.find(id)-> second = false;
+      waypointModel->AddWaypoint(Waypoint(now + pauseLength, pos));
+      waypointModel->AddWaypoint(Waypoint(pauseLength + timings[id], stopPositions[path[tramPositions.at (id)]]));
+
+
+      Simulator::Schedule (pauseLength + (timings[id] - now) + stopLength + Seconds(0.5), &SetStop, id);
+      Simulator::Schedule (pauseLength + (timings[id] - now), &ScheduleNextStop, waypointModel, id);
+
+  }
+}
 
 
 /*********************************** Config **************************************/
@@ -220,13 +342,13 @@ void CBTC::CreateNodes() {
 
 void CBTC::StopsConstantPositionModel(MobilityHelper &mobility) {
 
-  Ptr <ListPositionAllocator> stopPosAlloc = CreateObject<ListPositionAllocator>();
+  Ptr <ListPositionAllocator> stopPositionsAlloc = CreateObject<ListPositionAllocator>();
   for( auto& pozicia: stopPositions) {
-      stopPosAlloc -> Add(pozicia);
+      stopPositionsAlloc -> Add(pozicia);
   }
 
   mobility.SetMobilityModel("ns3::ConstantPositionMobilityModel");
-  mobility.SetPositionAllocator(stopPosAlloc);
+  mobility.SetPositionAllocator(stopPositionsAlloc);
   mobility.Install(stopNodes);
 }
 
@@ -237,12 +359,12 @@ void CBTC::TramsWaypointModel(MobilityHelper &mobility) {
   mobility.Install(tramNodes);
 
   // nastavenie pozicii do mobility modelu
-  Ptr <ListPositionAllocator> tramPosAlloc = CreateObject<ListPositionAllocator>();
+  Ptr <ListPositionAllocator> pozicieElektriciekAlloc = CreateObject<ListPositionAllocator>();
   for( int i = 0; i < tramsN; i++) {
-      tramPosAlloc -> Add(Vector(0.0, 0.0, 0.0));
+      pozicieElektriciekAlloc -> Add(Vector(0.0, 0.0, 0.0));
   }
 
-  mobility.SetPositionAllocator(tramPosAlloc);
+  mobility.SetPositionAllocator(pozicieElektriciekAlloc);
 
 
   // casovanie zastavky
@@ -277,12 +399,12 @@ void CBTC::TramsWaypointModel(MobilityHelper &mobility) {
 void CBTC::SetP2PDevices() {
 
   // spojenia medzi dvojicami zastavok
-  vector<vector<string>> pairs = { {"A","B"}, {"A","E"}, {"B","C"}, {"C","D"}, {"C","F"}, {"D","F"}, {"D","H"}, {"J","E"},
-                                   {"F","E"}, {"F","G"}, {"F","H"}, {"G","H"}, {"H","J"}, {"G","J"}, {"H","I"}, {"I","J"} };
+  vector<vector<string>> spojenia = { {"A","B"}, {"A","E"}, {"B","C"}, {"C","D"}, {"C","F"}, {"D","F"}, {"D","H"}, {"J","E"},
+                                      {"F","E"}, {"F","G"}, {"F","H"}, {"G","H"}, {"H","J"}, {"G","J"}, {"H","I"}, {"I","J"} };
 
   PointToPointHelper p2pHelper;
-  for (auto &p: pairs)
-    p2pHelper.Install(p[0], p[1]);
+  for (auto &spoj: spojenia)
+    p2pHelper.Install(spoj[0], spoj[1]);
 
 }
 
@@ -291,7 +413,7 @@ NetDeviceContainer CBTC::SetWifiDevices() {
      // wi-fi channel - elektricky
      YansWifiChannelHelper wChannel = YansWifiChannelHelper::Default ();
 
-     Config::SetDefault ("ns3::RangePropagationLossModel::MaxRange", DoubleValue (75));
+     Config::SetDefault ("ns3::RangePropagationLossModel::MaxRange", DoubleValue (50));
      wChannel.AddPropagationLoss ("ns3::RangePropagationLossModel");
 
      YansWifiPhyHelper phy;
@@ -320,10 +442,10 @@ void CBTC::SetRouting(NetDeviceContainer nicElektricky) {
 
   switch (protocol) {
     case 1:
-      internet.SetRoutingHelper(olsr);
+      internet.SetRoutingHelper(aodv);
       break;
     case 2:
-      internet.SetRoutingHelper(aodv);
+      internet.SetRoutingHelper(olsr);
       break;
     case 3:
       internet.SetRoutingHelper(dsdv);
@@ -347,10 +469,9 @@ void CBTC::SetRouting(NetDeviceContainer nicElektricky) {
 
 void CBTC::SetApplications() {
 
-  TypeId tid = TypeId::LookupByName ("ns3::UdpSocketFactory");
-
-  // vytvorenie socketov medzi elektrickami
   for (int i = 0, port = 80; i < tramNodes.GetN () - 1; i++, port--) {
+
+      TypeId tid = TypeId::LookupByName ("ns3::UdpSocketFactory");
 
       Ptr<Socket> recvSink = Socket::CreateSocket (tramNodes.Get (i + 1), tid);
       InetSocketAddress local = InetSocketAddress (Ipv4Address::GetAny (), port);
@@ -365,149 +486,31 @@ void CBTC::SetApplications() {
       sockets.push_back(source);
   }
 
-  // schedulovanie posielania paketov
-  for (int i = 0; i < tramsN - 1; i++) {
-      Simulator::ScheduleWithContext (sockets[i]->GetNode()->GetId(),
-                                      Seconds(5.0 + i*2),
-                                      &GenerateTraffic,
-                                      sockets[i],
-                                      packetSize,
-                                      Seconds (packetIntervalTrace));
+
+  for (int i = 0; i < tramsN-1; i++) {
+    Simulator::ScheduleWithContext (sockets[i]->GetNode ()->GetId (), Seconds(5.0  + 5.0 * i), &GenerateTraffic,
+                                    sockets[i], packetSize, Seconds (5.0));
   }
 
-}
+//  kontrolovanie vzdialenosti medzi elektrickami
+//  Simulator::Schedule (Seconds(5), &CheckDistances, tramNodes);
 
+  // ping z prvej elektricky
+//  PingniZoSource(sockets[0], Seconds(5.0));
 
-/********************************** Pakety *************************************/
-
-
-void CBTC::ReceivePacket (Ptr<Socket> socket) {
-
-
-  Ptr<Node> socketNode = socket -> GetNode();
-  Ptr<Packet> packet = socket->Recv();
-
-  while (packet) {
-
-      // elektricka zastavi
-      Ptr<WaypointMobilityModel> waypointModel = DynamicCast<WaypointMobilityModel>(socketNode -> GetObject<MobilityModel>());
-      StopTramMovement(waypointModel, socketNode -> GetId() - 10);
-
-      // vypis paketu
-      int packetSize = packet->GetSize();
-      uint8_t *buffer = new uint8_t[packetSize];
-
-      int size = packet->CopyData(buffer, packetSize);
-      string packetContent = string(buffer, buffer + packetSize);
-      packetContent.resize(packetContent.find('\0')); // odstrani sa padding z paketu
-
-      Ptr<Ipv4> ipv4 = socketNode -> GetObject<Ipv4>();
-      Ipv4InterfaceAddress iaddr = ipv4->GetAddress (1,0);
-
-      NS_LOG_UNCOND("[INFO] " << Simulator::Now() << " | Receiver: " << iaddr.GetLocal() << " | "
-                              << "Received ("<< size<< " B): " << packetContent << endl);
-
-    }
-}
-
-
-void CBTC::GenerateTraffic (Ptr<Socket> socket, uint32_t pktSize, Time pktInterval ) {
-
-  Ptr<Ipv4> ipv4 = socket -> GetNode() -> GetObject<Ipv4> ();
-  Ipv4InterfaceAddress iaddr = ipv4->GetAddress (1,0);
-
-  ostringstream msg; msg << "Hello World from " << iaddr.GetLocal() << '\0';
-
-  uint16_t messageLength = msg.str().length()+1;
-
-  Ptr<Packet> packet = Create<Packet>((uint8_t*) msg.str().c_str(), messageLength);
-  packet->AddPaddingAtEnd(pktSize - messageLength); // aby bol takej velkosti, ako pktSize
-  socket->Send (packet);
-  Simulator::Schedule (pktInterval, &GenerateTraffic, socket, pktSize, Seconds(2.0));
-
-}
-
-
-/**************************** Pohyb elektriciek *********************************/
-
-
-void CBTC::ScheduleNextStop (Ptr<WaypointMobilityModel> model, int id){
-
-  srand (time(NULL));
-
-  if (isStopped[id]){
-      isStopped.find (id) -> second = false;
-  }
-
-  else {
-    int nextStop = tramPositions.at (id) + 1;
-
-    if (nextStop == path.size () - 1){
-        tramPositions.find (id)->second = 0;
-        nextStop = 0;
-    } else {
-        tramPositions.find (id)->second = nextStop;
-    }
-
-    auto now = Simulator::Now () ;
-
-
-    // nastavenie nahodnej rychlosti
-    Time randTime = Seconds(rand() % 9 + 5);
-    timings.find(id) -> second = now + randTime + stopLength;
-
-//    cout << "ELEKTRICKA #" << id << " next stop -> " << nextStop << endl;
-    Vector nextStopPostition = stopPositions[path[nextStop]];
-    Vector currentStopPostition = stopPositions[path[nextStop - 1]];
-
-    // statie
-    model->AddWaypoint (Waypoint (now + stopLength, currentStopPostition));
-    // dalsia zastavka
-    model->AddWaypoint (Waypoint (timings[id], nextStopPostition));
-    // naschedulovanie dalsej zastavky
-    Simulator::Schedule (randTime + stopLength, &ScheduleNextStop, model, id);
-  }
-}
-
-
-void CBTC::SetStop(int id){
-  cout << "STOP reset # " << id << endl;
-  resetStop.find(id)-> second = true;
-}
-
-// zastavenie elektricky
-void CBTC::StopTramMovement(Ptr<WaypointMobilityModel> waypointModel, int id) {
-
-
-  auto now = Simulator::Now();
-
-  if (resetStop[id]){
-
-      cout << "-- elektricka " << id << " ZASTAV --" << endl;
-
-      Vector pos = waypointModel->GetPosition();
-      waypointModel->EndMobility();
-
-      isStopped.find(id)-> second = true;
-      resetStop.find(id)-> second = false;
-      waypointModel->AddWaypoint(Waypoint(now + stopLength, pos));
-      waypointModel->AddWaypoint(Waypoint(stopLength + timings[id], stopPositions[path[tramPositions.at (id)]]));
-
-
-      Simulator::Schedule (stopLength + (timings[id] - now) + stopLength + Seconds(0.5), &SetStop, id);
-      Simulator::Schedule (stopLength + (timings[id] - now), &ScheduleNextStop, waypointModel, id);
-
-  }
+  // ping z druhej elektricky
+//  PingniZoSource(sockets[1], Seconds(10.0));
 }
 
 
 /********************************** Spustenie ************************************/
 
+
 void CBTC::Run(int argc = -1, char **argv = nullptr) {
 
   // CMD line
   if (argc > 0)
-    SetCommandLineArgs(argc, argv);
+      SetCommandLineArgs(argc, argv);
 
   if (runtimeIntervalChange) {
       // odchytavanie udalosti – zmeny packetIntervalTrace
@@ -519,23 +522,27 @@ void CBTC::Run(int argc = -1, char **argv = nullptr) {
       packetIntervalTrace = packetInterval;
   }
 
-  // L1
+// L1
   CreateNodes();
 
   MobilityHelper mobility;
+
   StopsConstantPositionModel(mobility);
   TramsWaypointModel(mobility);
 
-  // L2
+
+//  Simulator::Schedule (Seconds(5), &Stop, DynamicCast<WaypointMobilityModel>(tramNodes.Get(1)->GetObject<MobilityModel>()), 1);
+//  Simulator::Schedule (Seconds(18), &Stop, DynamicCast<WaypointMobilityModel>(tramNodes.Get(1)->GetObject<MobilityModel>()), 1);
+//  Simulator::Schedule (Seconds(25), &Stop, DynamicCast<WaypointMobilityModel>(tramNodes.Get(1)->GetObject<MobilityModel>()), 1);
+//  Simulator::Schedule (Seconds(30), &Stop, DynamicCast<WaypointMobilityModel>(tramNodes.Get(1)->GetObject<MobilityModel>()), 1);
+
+// L2
   SetP2PDevices();
   NetDeviceContainer nicElektricky = SetWifiDevices();
-
-  // L3
+// L3
   SetRouting(nicElektricky);
-
-  // L4-L7
+// L4-L5
   SetApplications();
-
 
   // animacia
   if (saveAnim) {
@@ -555,8 +562,8 @@ void CBTC::Run(int argc = -1, char **argv = nullptr) {
         anim.UpdateNodeSize(tramNodes.Get(i)->GetId(),10,10);
     }
 
-    NS_LOG_UNCOND("[INFO] Animacia ulozena do CBTC_animacia.xml\n");
-//    cout << "[INFO] Animacia ulozena do CBTC_animacia.xml\n";
+//    NS_LOG_UNCOND("[INFO] Animacia ulozena do CBTC_animacia.xml\n");
+    cout << "[INFO] Animacia ulozena do CBTC_animacia.xml\n";
 
     Simulator::Stop(Seconds(totalTime));
     Simulator::Run ();
@@ -574,32 +581,26 @@ void CBTC::Run(int argc = -1, char **argv = nullptr) {
 
 /************************************ Main ***************************************/
 
-
 int main(int argc, char **argv) {
-  Ptr<CBTC> cbtcExperiment = CreateObject<CBTC>();
-  cbtcExperiment->Run(argc, argv);
+  CBTC cbtcExperiment;
+  cbtcExperiment.Run(argc, argv);
   return 0;
 }
 
-//vector<string> GetElementsFromContext (string& context) {
-//  vector <string> elements;
-//  size_t pos1 = 0, pos2;
-//  while (pos1 != context.npos)
-//    {
-//      pos1 = context.find ("/",pos1);
-//      pos2 = context.find ("/",pos1 + 1);
-//      elements.push_back (context.substr (pos1 + 1,pos2 - (pos1 + 1)));
-//      pos1 = pos2;
-//      pos2 = context.npos;
-//    }
-//  return elements;
-//}
-//
-//
-//Ptr <Node> GetNodeFromContext (string& context) {
-//  vector <string> elements = GetElementsFromContext (context);
-//  Ptr <Node> n = NodeList::GetNode (atoi (elements.at (1).c_str ()));
-//  NS_ASSERT (n);
-//  return n;
-//}
 
+//void CBTC::VytvorSocketyMedziElektrickami (){
+//
+//}
+//
+//
+//void CBTC::PingniZoSource(Ptr<Socket> source, Time time) {
+//  if(!source){
+//      NS_LOG_UNCOND("[ERROR] Source is null");
+//      return;
+//  }
+//
+////  cout << source->GetNode()->GetId() << endl;
+//
+//  Simulator::ScheduleWithContext (source->GetNode ()->GetId (), time, &GenerateTraffic,
+//                                  source, packetSize, Seconds (10.0));
+//}
