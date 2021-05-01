@@ -43,10 +43,11 @@ public:
 
   // nody
   NodeContainer nodyZastavky, nodyElektricky;
+  Ipv4InterfaceContainer interfaces;
 
   // CMD line argumenty
-  uint32_t pocetZastavok, pocetElektriciek, velkostUdajov, trvanieSimulacie;
-  bool ulozAnimaciu/*, logging*/;
+  uint32_t pocetZastavok, pocetElektriciek, velkostUdajov, trvanieSimulacie, protocol;
+  bool ulozAnimaciu;
 
   // pohyb elektriciek
   static double interval, delay;
@@ -69,7 +70,7 @@ public:
   /*--------------------- METHODS -----------------------*/
 
   // spustenie programu
-  void Run();
+  void Run(int argc, char **argv);
 
   // Config
   void SetCommandLineArgs (int argc, char **argv);
@@ -88,8 +89,8 @@ public:
   // callback
   static void ScheduleNextStop (Ptr<WaypointMobilityModel> model, int id);
   static void CheckDistances (NodeContainer nodyElektricky);
-  static void CourseChange (string context, Ptr<const MobilityModel> model);
-  static void GenerateTraffic (Ptr<Socket> socket, uint32_t pktSize, uint32_t pktCount, Time pktInterval);
+//  static void CourseChange (string context, Ptr<const MobilityModel> model);
+  static void GenerateTraffic (Ptr<Socket> socket, uint32_t pktSize, Time pktInterval);
   static void ReceivePacket (Ptr<Socket> socket);
 
   // ping
