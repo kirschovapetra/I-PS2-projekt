@@ -109,6 +109,9 @@ double CBTC::delay = 3.0;
 Time CBTC::stopLength = Seconds(2.0);
 Time CBTC::pauseLength = Seconds(5.0);
 int32_t CBTC::collisionCounter = 0;
+int32_t CBTC::stopCounter = 0;
+int32_t CBTC::sentPacketsCounter = 0;
+int32_t CBTC::receivedPacketsCounter = 0;
 
 map<int, Time> CBTC::timings;
 map<int, bool > CBTC::isStopped;
@@ -135,7 +138,7 @@ vector<Vector> CBTC::stopPositions = { Vector(0.0, 0.0, 0.0),        //A
 
 
 CBTC::CBTC(uint32_t tramsN = 4, uint32_t packetSize = 50, uint32_t totalTime = 300, bool saveAnim = true,
-           uint32_t protocol = 2, uint32_t packetInterval = 1, bool runtimeIntervalChange = true) {
+           uint32_t protocol = 2, uint32_t packetInterval = 1, bool runtimeIntervalChange = true, int32_t range = 100) {
 
   // CMD line argumenty
   this->tramsN = tramsN;
@@ -145,6 +148,7 @@ CBTC::CBTC(uint32_t tramsN = 4, uint32_t packetSize = 50, uint32_t totalTime = 3
   this->protocol = protocol;
   this->packetInterval = packetInterval;
   this->runtimeIntervalChange = runtimeIntervalChange;
+  this->range = range;
 }
 
 
@@ -199,9 +203,10 @@ void CBTC::ReceivePacket (Ptr<Socket> socket) {
       Ptr<Ipv4> ipv4 = socketNode -> GetObject<Ipv4>();
       Ipv4InterfaceAddress iaddr = ipv4->GetAddress (1,0);
 
-      NS_LOG_UNCOND("[INFO] " << Simulator::Now() << " | Receiver: " << iaddr.GetLocal() << " | "
-                              << "Received ("<< size<< " B): " << packetContent);
+      //NS_LOG_UNCOND("[INFO] " << Simulator::Now() << " | Receiver: " << iaddr.GetLocal() << " | "
+      //                        << "Received ("<< size<< " B): " << packetContent);
 
+      receivedPacketsCounter++;
     }
 }
 
@@ -217,7 +222,10 @@ void CBTC::GenerateTraffic (Ptr<Socket> socket, uint32_t pktSize, Time pktInterv
 
   Ptr<Packet> packet = Create<Packet>((uint8_t*) msg.str().c_str(), messageLength);
   packet->AddPaddingAtEnd(pktSize - messageLength); // aby bol takej velkosti, ako pktSize
+
   socket->Send (packet);
+  sentPacketsCounter++;
+
   Simulator::Schedule (pktInterval, &GenerateTraffic, socket, pktSize, pktInterval);
 
 }
@@ -273,11 +281,13 @@ void CBTC::ResetStop(int id){
 // zastavenie elektricky
 void CBTC::StopTramMovement(Ptr<WaypointMobilityModel> waypointModel, int id) {
 
+
   Time now = Simulator::Now();
 
   if (resetStop[id] && (waypointModel->GetNextWaypoint().position != stopPositions[0])){
+      stopCounter ++;
 
-      cout << "-- elektricka " << id << " ZASTAV --" << endl;
+      cout << "-- elektricka " << id << " ZASTAV --" << stopCounter << endl;
 
       Vector pos = waypointModel->GetPosition();
       waypointModel->EndMobility();
@@ -287,8 +297,10 @@ void CBTC::StopTramMovement(Ptr<WaypointMobilityModel> waypointModel, int id) {
       waypointModel->AddWaypoint(Waypoint(now + pauseLength, pos));
       waypointModel->AddWaypoint(Waypoint(pauseLength + timings[id], stopPositions[path[tramPositions.at (id)]]));
 
+
       Simulator::Schedule (pauseLength + (timings[id] - now) + stopLength + Seconds(0.5), &ResetStop, id);
       Simulator::Schedule (pauseLength + (timings[id] - now), &ScheduleNextStop, waypointModel, id);
+
   }
 }
 
@@ -329,6 +341,7 @@ void CBTC::SetCommandLineArgs(int argc, char **argv) {
   cmd.AddValue ("protocol", "Routovaci protokol: 1=OLSR;2=AODV", protocol);
   cmd.AddValue ("packetInterval", "Interval posielania hello paketov", packetInterval);
   cmd.AddValue ("runtimeIntervalChange", "Zmena intervalu posielania paketov pocas behu simulacie true/false", runtimeIntervalChange);
+  cmd.AddValue ("range", "Rozsah signalu", range);
   // dalsie parametre ...
   cmd.Parse(argc, argv);
 
@@ -340,7 +353,8 @@ void CBTC::SetCommandLineArgs(int argc, char **argv) {
                 << " --tramN=" << tramsN
                 << " --protocol=" << protocol
                 << " --packetInterval=" << packetInterval
-                << " --runtimeIntervalChange=" << runtimeIntervalChange << endl);
+                << " --runtimeIntervalChange=" << runtimeIntervalChange
+                << " --range=" << range << endl);
 
 }
 
@@ -431,7 +445,7 @@ NetDeviceContainer CBTC::SetWifiDevices() {
      // wi-fi channel - elektricky
      YansWifiChannelHelper wChannel = YansWifiChannelHelper::Default ();
 
-     Config::SetDefault ("ns3::RangePropagationLossModel::MaxRange", DoubleValue (100));
+     Config::SetDefault ("ns3::RangePropagationLossModel::MaxRange", DoubleValue (range));
      wChannel.AddPropagationLoss ("ns3::RangePropagationLossModel");
 
      YansWifiPhyHelper phy;
@@ -502,36 +516,13 @@ void CBTC::SetApplications() {
                                     sockets[i], packetSize, Seconds (packetIntervalTrace));
   }
 
-  // ping z prvej elektricky
-//  PingniZoSource(sockets[0], Seconds(5.0));
-
-  // ping z druhej elektricky
-//  PingniZoSource(sockets[1], Seconds(10.0));
 }
 
 
 /********************************** Spustenie ************************************/
 
-void PrintNodeResults(double nodeNumber, Ipv4Address sourceAddress, Ipv4Address destinationAddress, double packetsSent, double packetsReceived, double throughput)
-{
-    std::cout << "Flow " << nodeNumber << " (" << sourceAddress << " -> " << destinationAddress << ")\n";
-    std::cout << "  Tx Packets: " << packetsSent << "\n";
-    std::cout << "  Rx Packets: " << packetsReceived << "\n";
-    std::cout << "  Throughput: " << throughput << " Mbps\n";
-}
 
 void CBTC::Run(int argc = -1, char **argv = nullptr) {
-
-      /*Gnuplot gnuplot("demolitionDerby-graph.svg");
-      gnuplot.SetTerminal("svg");
-      gnuplot.SetTitle("Throughput in relation to number of nodes");
-      gnuplot.SetLegend("Number of nodes", "Throughput [Mbps]");
-      // give the graph some padding on both sides
-     // gnuplot.AppendExtra("set xrange[-1:" + std::to_string(numOfTests*nodesMultiplier*1.2) + "]");
-
-      Gnuplot2dDataset gnuplotData;
-      gnuplotData.SetStyle (Gnuplot2dDataset::LINES_POINTS);
-      gnuplotData.SetErrorBars(Gnuplot2dDataset::Y);*/
 
   // CMD line
   if (argc > 0)
@@ -548,7 +539,14 @@ void CBTC::Run(int argc = -1, char **argv = nullptr) {
   }
 
   collisionCounter = 0;
+  stopCounter = 0;
+  sentPacketsCounter = 0;
+  receivedPacketsCounter = 0;
 
+  timings = {};
+  isStopped = {};
+  resetStop = {};
+  tramPositions = {};
 
   CreateNodes();
   delay = tramsN;
@@ -685,7 +683,7 @@ void CollisionsOverTime(int protocol) {
             /*(uint32_t tramsN = 4, uint32_t packetSize = 50, uint32_t totalTime = 300, bool saveAnim = true,
                        uint32_t protocol = 2, uint32_t packetInterval = 1, bool runtimeIntervalChange = true)*/
             Names::Clear();
-            Ptr<CBTC> cbtcExperiment = CreateObject<CBTC>(4, 50, totalTime, false, protocol, 1, true);
+            Ptr<CBTC> cbtcExperiment = CreateObject<CBTC>(4, 50, totalTime, false, protocol, 1, true, 100);
             cbtcExperiment->Run();
             collisionCounts.push_back(cbtcExperiment->collisionCounter);
 
@@ -706,14 +704,137 @@ void CollisionsOverTime(int protocol) {
 
 }
 
+void CollisionsTramCount(int protocol){
+  string protocolStr = protocol == 1 ? "AODV" : "OLSR";
+
+  vector<int> tramCountX;
+  vector<double> avgCollisionsY;
+  vector<double> devCollisionsY;
+
+  for (int testNumber = 0, tramCount = 2; testNumber < 10; testNumber++, tramCount++) {
+
+        vector<int> collisionCounts;
+
+        for(int f=0; f < 3; f++) {
+            /*(uint32_t tramsN = 4, uint32_t packetSize = 50, uint32_t totalTime = 300, bool saveAnim = true,
+                       uint32_t protocol = 2, uint32_t packetInterval = 1, bool runtimeIntervalChange = true)*/
+            Names::Clear();
+            Ptr<CBTC> cbtcExperiment = CreateObject<CBTC>(tramCount, 50, 50.0, false, protocol, 1, true, 100);
+            cbtcExperiment->Run();
+            collisionCounts.push_back(cbtcExperiment->collisionCounter);
+
+        }
+
+        tramCountX.push_back(tramCount);
+        avgCollisionsY.push_back(average(collisionCounts));
+        devCollisionsY.push_back(deviation(collisionCounts));
+
+  }
+  visualize(tramCountX,
+            avgCollisionsY,
+            devCollisionsY,
+            "Number of collisions in relation to number of trams during 50 sec ("+protocolStr+")",
+            "Number of trams",
+            "Collisions",
+            "CollisionsTramCount"+protocolStr);
+}
+
+
+void StopTramCount(int protocol){
+  string protocolStr = protocol == 1 ? "AODV" : "OLSR";
+
+  vector<int> tramCountX;
+  vector<double> avgStopsY;
+  vector<double> devStopsY;
+
+  for (int testNumber = 0, tramCount = 2; testNumber < 10; testNumber++, tramCount++) {
+
+        vector<int> stopCounts;
+
+        for(int f=0; f < 3; f++) {
+            /*(uint32_t tramsN = 4, uint32_t packetSize = 50, uint32_t totalTime = 300, bool saveAnim = true,
+                       uint32_t protocol = 2, uint32_t packetInterval = 1, bool runtimeIntervalChange = true)*/
+            Names::Clear();
+            Ptr<CBTC> cbtcExperiment = CreateObject<CBTC>(tramCount, 50, 50.0, false, protocol, 1, false, 100);
+            cbtcExperiment->Run();
+            stopCounts.push_back(cbtcExperiment->stopCounter);
+
+        }
+
+        tramCountX.push_back(tramCount);
+        avgStopsY.push_back(average(stopCounts));
+        devStopsY.push_back(deviation(stopCounts));
+
+  }
+  visualize(tramCountX,
+            avgStopsY,
+            devStopsY,
+            "Number of stops in relation to number of trams during 50 sec ("+protocolStr+")",
+            "Number of trams",
+            "Number of stops",
+            "StopTramCount"+protocolStr);
+}
+
+/*void StopCollisionCount(int protocol){
+  string protocolStr = protocol == 1 ? "AODV" : "OLSR";
+
+  vector<int> stopCountX;
+  vector<double> avgCollisionsY;
+  vector<double> devCollisionsY;
+
+  for (int testNumber = 0; testNumber < 10; testNumber++) {
+
+        vector<int> collisionCounts;
+        vector<int> stopCounts;
+
+        for(int f=0; f < 3; f++) {
+
+            Names::Clear();
+            Ptr<CBTC> cbtcExperiment = CreateObject<CBTC>(5, 50, 100.0, false, protocol, 1, false);
+            cbtcExperiment->Run();
+            stopCounts.push_back(cbtcExperiment->stopCounter);
+            collisionCounts.push_back(cbtcExperiment->collisionCounter);
+
+        }
+
+        stopCountX.push_back(average(stopCounts));
+        avgCollisionsY.push_back(average(collisionCounts));
+        devCollisionsY.push_back(deviation(collisionCounts));
+
+  }
+
+
+
+  visualize(stopCountX,
+            avgCollisionsY,
+            devCollisionsY,
+            "Number of stops in relation to number of collisions during 100 sec ("+protocolStr+")",
+            "Number of stops",
+            "Number of collisions",
+            "StopCollisionCount"+protocolStr);
+}*/
 
 int main(int argc, char **argv) {
 
   SeedManager::SetSeed(rand());
   SeedManager::SetRun(10);
 
-  CollisionsOverTime(1);
-  CollisionsOverTime(2);
+  //CollisionsOverTime(1);
+  //CollisionsOverTime(2);
+
+  //CollisionsTramCount(1);
+  //CollisionsTramCount(2);
+
+  //StopTramCount(1);
+  //StopTramCount(2);
+
+  //StopCollisionCount(2); toto nie
+
+  Ptr<CBTC> cbtcExperiment = CreateObject<CBTC>(4, 50, 50.0, false, 1, 1, false, 100);
+  cbtcExperiment->Run();
+  cout << cbtcExperiment->receivedPacketsCounter << " " << cbtcExperiment->sentPacketsCounter << endl;
+
+  cout << "\nvybafco" << endl;
 
 
   return 0;

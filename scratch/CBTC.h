@@ -26,7 +26,7 @@ class CBTC: public Object {
 public:
 
   CBTC( uint32_t tramsN, uint32_t packetSize, uint32_t totalTime, bool saveAnim,
-        uint32_t protocol, uint32_t packetInterval, bool runtimeIntervalChange);
+        uint32_t protocol, uint32_t packetInterval, bool runtimeIntervalChange, int32_t range);
 
   ~CBTC();
 
@@ -38,13 +38,16 @@ public:
   uint32_t stopsN = 10;
 
   // CMD line argumenty
-  uint32_t tramsN, packetSize, totalTime, protocol, packetInterval;
+  uint32_t tramsN, packetSize, totalTime, protocol, packetInterval, range;
   bool saveAnim, runtimeIntervalChange;
   TracedValue<int32_t> packetIntervalTrace = 2.0; // trace-ovana zmena intervalu posielania paketov
 
   // pohyb elektriciek
   static double delay;
   static int32_t collisionCounter;
+  static int32_t stopCounter;
+  static int32_t sentPacketsCounter;
+  static int32_t receivedPacketsCounter;
   static Time stopLength;
   static Time pauseLength;
   static vector<int> path;
