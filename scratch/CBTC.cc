@@ -265,7 +265,7 @@ void CBTC::ScheduleNextStop (Ptr<WaypointMobilityModel> model, int id){
 }
 
 
-void CBTC::SetStop(int id){
+void CBTC::ResetStop(int id){
   cout << "STOP reset # " << id << endl;
   resetStop.find(id)-> second = true;
 }
@@ -273,14 +273,9 @@ void CBTC::SetStop(int id){
 // zastavenie elektricky
 void CBTC::StopTramMovement(Ptr<WaypointMobilityModel> waypointModel, int id) {
 
+  Time now = Simulator::Now();
 
-  auto now = Simulator::Now();
-
-  bool x = waypointModel->GetNextWaypoint().position.x != 0.0;
-  bool y = waypointModel->GetNextWaypoint().position.y != 0.0;
-  bool z = waypointModel->GetNextWaypoint().position.z != 0.0;
-
-  if (resetStop[id] && (x || y || z)){
+  if (resetStop[id] && (waypointModel->GetNextWaypoint().position != stopPositions[0])){
 
       cout << "-- elektricka " << id << " ZASTAV --" << endl;
 
@@ -292,10 +287,8 @@ void CBTC::StopTramMovement(Ptr<WaypointMobilityModel> waypointModel, int id) {
       waypointModel->AddWaypoint(Waypoint(now + pauseLength, pos));
       waypointModel->AddWaypoint(Waypoint(pauseLength + timings[id], stopPositions[path[tramPositions.at (id)]]));
 
-
-      Simulator::Schedule (pauseLength + (timings[id] - now) + stopLength + Seconds(0.5), &SetStop, id);
+      Simulator::Schedule (pauseLength + (timings[id] - now) + stopLength + Seconds(0.5), &ResetStop, id);
       Simulator::Schedule (pauseLength + (timings[id] - now), &ScheduleNextStop, waypointModel, id);
-
   }
 }
 
