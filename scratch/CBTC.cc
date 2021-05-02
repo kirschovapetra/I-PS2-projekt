@@ -92,8 +92,8 @@ vector<Vector> CBTC::stopPositions = { Vector(0.0, 0.0, 0.0),     //A
 
 /*****************************************************************************************************************************/
 
-CBTC::CBTC(uint32_t tramsN = 4, uint32_t packetSize = 50, uint32_t totalTime = 300, bool saveAnim = true,
-           uint32_t protocol = 2, uint32_t packetInterval = 1, bool runtimeIntervalChange = true, int32_t range = 100) {
+CBTC::CBTC(uint32_t tramsN = 3, uint32_t packetSize = 50, uint32_t totalTime = 500, bool saveAnim = true,
+           uint32_t protocol = 1, uint32_t packetInterval = 1, bool runtimeIntervalChange = true, int32_t range = 100) {
 
   // CMD line argumenty
   this->tramsN = tramsN;
@@ -881,45 +881,41 @@ int main(int argc, char **argv) {
   int action = -1;
 
   // je mozne generovat graf pre protokol 1=AODV alebo 2=OLSR
-//  switch(action) {
-//  case 1:
-//    CollisionsOverTime(1);
-//    //CollisionsOverTime(2);
-//    break;
-//  case 2:
-//    CollisionsTramCount(1);
-//    //CollisionsTramCount(2);
-//    break;
-//  case 3:
-//    StopTramCount(1);
-//    //StopTramCount(2);
-//    break;
-//  case 4:
-//    RangePacketCount(1);
-//    //RangePacketCount(2);
-//    break;
-//  case 5:
-//    TramCountLostPackets(1);
-//    //TramCountLostPackets(2);
-//    break;
-//  case 6:
-//    ReceivedPacketsRatioOverTime(1);
-//    //ReceivedPacketsRatioOverTime(2);
-//    break;
-//  case 7:
-//    IntervalSizeCollisionCount(1);
-//    //IntervalSizeCollisionCount(2);
-//    break;
-//  default:
-//    Ptr<CBTC> cbtcExperiment = CreateObject<CBTC>();
-//    cbtcExperiment->Run(argc,argv);
-//    break;
-//  }
+  switch(action) {
+  case 1:
+    CollisionsOverTime(1);
+    //CollisionsOverTime(2);
+    break;
+  case 2:
+    CollisionsTramCount(1);
+    //CollisionsTramCount(2);
+    break;
+  case 3:
+    StopTramCount(1);
+    //StopTramCount(2);
+    break;
+  case 4:
+    RangePacketCount(1);
+    //RangePacketCount(2);
+    break;
+  case 5:
+    TramCountLostPackets(1);
+    //TramCountLostPackets(2);
+    break;
+  case 6:
+    ReceivedPacketsRatioOverTime(1);
+    //ReceivedPacketsRatioOverTime(2);
+    break;
+  case 7:
+    IntervalSizeCollisionCount(1);
+    //IntervalSizeCollisionCount(2);
+    break;
+  default:
+    Ptr<CBTC> cbtcExperiment = CreateObject<CBTC>();
+    cbtcExperiment->Run(argc,argv);
+    break;
+  }
 
-
-  TramCountLostPackets(1);
-  ReceivedPacketsRatioOverTime(1);
-  IntervalSizeCollisionCount(1);
 
   return 0;
 }
