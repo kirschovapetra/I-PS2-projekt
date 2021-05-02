@@ -85,10 +85,6 @@ public:
   static void GenerateTraffic(Ptr<Socket> socket, uint32_t pktSize, Time pktInterval);
   static void ReceivePacket(Ptr<Socket> socket);
 
-//  // ping
-//   void VytvorSocketyMedziElektrickami ();
-//   void PingniZoSource(Ptr<Socket> source, Time time);
-
 };
 
 // prepisanie intervalu paketov
@@ -97,5 +93,7 @@ void RewritePacketInterval(Ptr<CBTC> thisPtr);
 void PacketIntervalChanged (int32_t oldValue, int32_t newValue);
 // callback na prijatie paketu
 void ReceivePacket (Ptr<Socket> socket);
+
+/***************************************** vytvaranie grafov *********************************************/
 
 #endif
