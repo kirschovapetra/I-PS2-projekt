@@ -285,7 +285,7 @@ void CBTC::SetCommandLineArgs(int argc, char **argv) {
   cmd.AddValue ("saveAnim", "Ulozenie animacie", saveAnim);
   cmd.AddValue ("packetSize", "Velkost paketu.", packetSize);
   cmd.AddValue ("totalTime", "Trvanie simulacie.", totalTime);
-  cmd.AddValue ("tramN", "Pocet elektriciek.", tramsN);
+  cmd.AddValue ("tramsN", "Pocet elektriciek.", tramsN);
   cmd.AddValue ("protocol", "Routovaci protokol: 1=AODV;2=OLSR", protocol);
   cmd.AddValue ("packetInterval", "Interval posielania hello paketov", packetInterval);
   cmd.AddValue ("runtimeIntervalChange", "Zmena intervalu posielania paketov pocas behu simulacie true/false", runtimeIntervalChange);
@@ -521,15 +521,13 @@ void CBTC::Run(int argc = -1, char **argv = nullptr) {
 
       for (uint32_t i = 0; i < stopsN; ++i) {
         anim.UpdateNodeColor (stopNodes.Get (i), 0, 0, 200);
-        anim.UpdateNodeDescription (stopNodes.Get (i),
-                                    Names::FindName (stopNodes.Get (i)));
+        anim.UpdateNodeDescription (stopNodes.Get (i), Names::FindName (stopNodes.Get (i)));
         anim.UpdateNodeSize (stopNodes.Get (i)->GetId (), 10, 10);
       }
 
       for (uint32_t i = 0; i < tramsN; ++i) {
         anim.UpdateNodeColor (tramNodes.Get (i), 0, 200, 0);
-        anim.UpdateNodeDescription (tramNodes.Get (i),
-                                    Names::FindName (tramNodes.Get (i)));
+        anim.UpdateNodeDescription (tramNodes.Get (i), Names::FindName (tramNodes.Get (i)));
         anim.UpdateNodeSize (tramNodes.Get (i)->GetId (), 10, 10);
       }
 
@@ -618,8 +616,6 @@ void CollisionsOverTime(int protocol) {
         vector<int> collisionCounts;
 
         for(int f=0; f < 3; f++) {
-            /*(uint32_t tramsN = 4, uint32_t packetSize = 50, uint32_t totalTime = 300, bool saveAnim = true,
-                       uint32_t protocol = 2, uint32_t packetInterval = 1, bool runtimeIntervalChange = true)*/
             Names::Clear();
             Ptr<CBTC> cbtcExperiment = CreateObject<CBTC>(4, 50, totalTime, false, protocol, 1, true, 100);
             cbtcExperiment->Run();
@@ -655,8 +651,6 @@ void CollisionsTramCount(int protocol){
         vector<int> collisionCounts;
 
         for(int f=0; f < 3; f++) {
-            /*(uint32_t tramsN = 4, uint32_t packetSize = 50, uint32_t totalTime = 300, bool saveAnim = true,
-                       uint32_t protocol = 2, uint32_t packetInterval = 1, bool runtimeIntervalChange = true)*/
             Names::Clear();
             Ptr<CBTC> cbtcExperiment = CreateObject<CBTC>(tramCount, 50, 50.0, false, protocol, 1, true, 100);
             cbtcExperiment->Run();
@@ -691,8 +685,6 @@ void StopTramCount(int protocol){
         vector<int> stopCounts;
 
         for(int f=0; f < 3; f++) {
-            /*(uint32_t tramsN = 4, uint32_t packetSize = 50, uint32_t totalTime = 300, bool saveAnim = true,
-                       uint32_t protocol = 2, uint32_t packetInterval = 1, bool runtimeIntervalChange = true)*/
             Names::Clear();
             Ptr<CBTC> cbtcExperiment = CreateObject<CBTC>(tramCount, 50, 50.0, false, protocol, 1, false, 100);
             cbtcExperiment->Run();
@@ -727,8 +719,6 @@ void RangePacketCount(int protocol) {
         vector<int> recPackets;
 
         for(int f=0; f < 3; f++) {
-            /*(uint32_t tramsN = 4, uint32_t packetSize = 50, uint32_t totalTime = 300, bool saveAnim = true,
-                       uint32_t protocol = 2, uint32_t packetInterval = 1, bool runtimeIntervalChange = true)*/
             Names::Clear();
             Ptr<CBTC> cbtcExperiment = CreateObject<CBTC>(4, 50, 50.0, false, protocol, 1, false, range);
             cbtcExperiment->Run();
@@ -762,8 +752,6 @@ void TramCountLostPackets(int protocol){
         vector<int> lostPacketsCounts;
 
         for(int f=0; f < 3; f++) {
-            /*(uint32_t tramsN = 4, uint32_t packetSize = 50, uint32_t totalTime = 300, bool saveAnim = true,
-                       uint32_t protocol = 2, uint32_t packetInterval = 1, bool runtimeIntervalChange = true)*/
             Names::Clear();
             Ptr<CBTC> cbtcExperiment = CreateObject<CBTC>(tramCount, 50, 50.0, false, protocol, 1, false, 100);
             cbtcExperiment->Run();
@@ -802,8 +790,6 @@ void ReceivedPacketsRatioOverTime(int protocol){
         vector<int> recPacketsRatios;
 
         for(int f=0; f < 5; f++) {
-            /*(uint32_t tramsN = 4, uint32_t packetSize = 50, uint32_t totalTime = 300, bool saveAnim = true,
-                       uint32_t protocol = 2, uint32_t packetInterval = 1, bool runtimeIntervalChange = true)*/
             Names::Clear();
             Ptr<CBTC> cbtcExperiment = CreateObject<CBTC>(4, 50, totalTime, false, protocol, 1, false, 100);
             cbtcExperiment->Run();
@@ -844,8 +830,6 @@ void IntervalSizeCollisionCount(int protocol){
         vector<int> collisionCounts;
 
         for(int f=0; f < 5; f++) {
-            /*(uint32_t tramsN = 4, uint32_t packetSize = 50, uint32_t totalTime = 300, bool saveAnim = true,
-                       uint32_t protocol = 2, uint32_t packetInterval = 1, bool runtimeIntervalChange = true, int32_t range=100)*/
             Names::Clear();
             Ptr<CBTC> cbtcExperiment = CreateObject<CBTC>(5, 50, 200.0, false, protocol, interval, false, 100);
             cbtcExperiment->Run();
