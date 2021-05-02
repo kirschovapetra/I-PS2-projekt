@@ -286,7 +286,7 @@ void CBTC::SetCommandLineArgs(int argc, char **argv) {
   cmd.AddValue ("packetSize", "Velkost paketu.", packetSize);
   cmd.AddValue ("totalTime", "Trvanie simulacie.", totalTime);
   cmd.AddValue ("tramN", "Pocet elektriciek.", tramsN);
-  cmd.AddValue ("protocol", "Routovaci protokol: 1=OLSR;2=AODV", protocol);
+  cmd.AddValue ("protocol", "Routovaci protokol: 1=AODV;2=OLSR", protocol);
   cmd.AddValue ("packetInterval", "Interval posielania hello paketov", packetInterval);
   cmd.AddValue ("runtimeIntervalChange", "Zmena intervalu posielania paketov pocas behu simulacie true/false", runtimeIntervalChange);
   cmd.AddValue ("range", "Rozsah signalu", range);
