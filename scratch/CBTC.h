@@ -76,7 +76,7 @@ public:
   // pohyb elektriciek
   static void StopTramMovement(Ptr<WaypointMobilityModel> elektricka, int id);
   static void ScheduleNextStop(Ptr<WaypointMobilityModel> model, int id);
-  static void SetStop(int id);
+  static void ResetStop(int id);
   static void CheckDistances (NodeContainer tramNodes);
   // posielanie paketov
   static void GenerateTraffic(Ptr<Socket> socket, uint32_t pktSize, Time pktInterval);
