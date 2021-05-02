@@ -608,10 +608,10 @@ void CBTC::Run(int argc = -1, char **argv = nullptr) {
 }
 
 
-void visualize (vector<int> X, vector<double> avgY, vector<double> devY, string title, string xAxis, string yAxis, string Volaco) {
+void visualize (vector<int> X, vector<double> avgY, vector<double> devY, string title, string xAxis, string yAxis, string filename) {
 
 
-  Gnuplot graf (Volaco + ".svg");
+  Gnuplot graf (filename + ".svg");
   graf.SetTerminal ("svg");
   graf.SetTitle (title);
   graf.SetLegend (xAxis, yAxis);
@@ -633,10 +633,10 @@ void visualize (vector<int> X, vector<double> avgY, vector<double> devY, string 
   graf.AddDataset(errorBars);
   graf.AddDataset(data);
 
-  std::ofstream plotFile (Volaco + ".plt");
+  std::ofstream plotFile (filename + ".plt");
   graf.GenerateOutput (plotFile);
   plotFile.close ();
-  if (system (("gnuplot " + Volaco + ".plt").c_str()));
+  if (system (("gnuplot " + filename + ".plt").c_str()));
 }
 
 double average(vector<int> data){
@@ -703,6 +703,7 @@ void CollisionsOverTime(int protocol) {
             "CollisionsOverTime"+protocolStr);
 
 }
+
 
 void CollisionsTramCount(int protocol){
   string protocolStr = protocol == 1 ? "AODV" : "OLSR";
@@ -775,6 +776,7 @@ void StopTramCount(int protocol){
             "StopTramCount"+protocolStr);
 }
 
+
 /*void StopCollisionCount(int protocol){
   string protocolStr = protocol == 1 ? "AODV" : "OLSR";
 
@@ -814,6 +816,166 @@ void StopTramCount(int protocol){
             "StopCollisionCount"+protocolStr);
 }*/
 
+
+// range posielania paketov x pocet paketov
+void RangePacketCount(int protocol) {
+  string protocolStr = protocol == 1 ? "AODV" : "OLSR";
+
+  vector<int> rangeX;
+  vector<double> avgRecPacketsY;
+  vector<double> devRecPacketsY;
+
+  for (int testNumber = 0, range = 20; testNumber < 10; testNumber++, range += 20) {
+
+        vector<int> recPackets;
+
+        for(int f=0; f < 3; f++) {
+            /*(uint32_t tramsN = 4, uint32_t packetSize = 50, uint32_t totalTime = 300, bool saveAnim = true,
+                       uint32_t protocol = 2, uint32_t packetInterval = 1, bool runtimeIntervalChange = true)*/
+            Names::Clear();
+            Ptr<CBTC> cbtcExperiment = CreateObject<CBTC>(4, 50, 50.0, false, protocol, 1, false, range);
+            cbtcExperiment->Run();
+            recPackets.push_back(cbtcExperiment->receivedPacketsCounter);
+        }
+
+        rangeX.push_back(range);
+        avgRecPacketsY.push_back(average(recPackets));
+        devRecPacketsY.push_back(deviation(recPackets));
+
+  }
+  visualize(rangeX,
+            avgRecPacketsY,
+            devRecPacketsY,
+            "Range of signal in relation to number of received packets during 50 sec ("+protocolStr+")",
+            "Range of signal [m]",
+            "Number of received packets",
+            "RangePacketCount"+protocolStr);
+}
+
+
+//pocet elektriciek x pocet stratenych paketov
+void TramCountLostPackets(int protocol){
+  string protocolStr = protocol == 1 ? "AODV" : "OLSR";
+
+  vector<int> tramCountX;
+  vector<double> avgLostPacketsY;
+  vector<double> devLostPacketsY;
+
+  for (int testNumber = 0, tramCount = 2; testNumber < 10; testNumber++, tramCount++) {
+
+        vector<int> lostPacketsCounts;
+
+        for(int f=0; f < 3; f++) {
+            /*(uint32_t tramsN = 4, uint32_t packetSize = 50, uint32_t totalTime = 300, bool saveAnim = true,
+                       uint32_t protocol = 2, uint32_t packetInterval = 1, bool runtimeIntervalChange = true)*/
+            Names::Clear();
+            Ptr<CBTC> cbtcExperiment = CreateObject<CBTC>(tramCount, 50, 50.0, false, protocol, 1, false, 100);
+            cbtcExperiment->Run();
+
+            int rec = cbtcExperiment->receivedPacketsCounter;
+            int sent = cbtcExperiment->sentPacketsCounter;
+
+            lostPacketsCounts.push_back(sent-rec);
+
+        }
+
+        tramCountX.push_back(tramCount);
+        avgLostPacketsY.push_back(average(lostPacketsCounts));
+        devLostPacketsY.push_back(deviation(lostPacketsCounts));
+
+  }
+  visualize(tramCountX,
+            avgLostPacketsY,
+            devLostPacketsY,
+            "Number of trams in relation to number of lost packets during 50 sec ("+protocolStr+")",
+            "Number of trams",
+            "Number of lost packets",
+            "TramCountLostPackets"+protocolStr);
+}
+
+
+// pomer prijatych paketov k odoslanym paketom za cas (v %)
+void ReceivedPacketsRatioOverTime(int protocol){
+  string protocolStr = protocol == 1 ? "AODV" : "OLSR";
+
+  vector<int> timesX;
+  vector<double> avgRecPacketsRatioY;
+  vector<double> devRecPacketsRatioY;
+
+  for (int testNumber = 0, totalTime = 10; testNumber < 10; testNumber++, totalTime+=5) {
+
+        vector<int> recPacketsRatios;
+
+        for(int f=0; f < 5; f++) {
+            /*(uint32_t tramsN = 4, uint32_t packetSize = 50, uint32_t totalTime = 300, bool saveAnim = true,
+                       uint32_t protocol = 2, uint32_t packetInterval = 1, bool runtimeIntervalChange = true)*/
+            Names::Clear();
+            Ptr<CBTC> cbtcExperiment = CreateObject<CBTC>(4, 50, totalTime, false, protocol, 1, false, 100);
+            cbtcExperiment->Run();
+
+            int rec = cbtcExperiment->receivedPacketsCounter;
+            int sent = cbtcExperiment->sentPacketsCounter;
+
+            double percent = ((double)rec)/(double)sent * 100.0;
+            cout << percent << endl;
+
+            recPacketsRatios.push_back(percent);
+        }
+
+        timesX.push_back(totalTime);
+        avgRecPacketsRatioY.push_back(average(recPacketsRatios));
+        devRecPacketsRatioY.push_back(deviation(recPacketsRatios));
+  }
+
+  visualize(timesX,
+            avgRecPacketsRatioY,
+            devRecPacketsRatioY,
+            "Ratio of received packets to sent packets (in %) over time ("+protocolStr+")",
+            "Time [s]",
+            "Received packets / sent packets [%]",
+            "ReceivedPacketsRatioOverTime"+protocolStr);
+}
+
+
+// velkost intervalu paketov x pocet kolizii
+void IntervalSizeCollisionCount(int protocol){
+  string protocolStr = protocol == 1 ? "AODV" : "OLSR";
+
+  vector<int> intervalSizeX;
+  vector<double> avgCollisionCountY;
+  vector<double> devCollisionCountY;
+
+  for (int testNumber = 0, interval = 1; testNumber < 10; testNumber++, interval++) {
+
+        vector<int> collisionCounts;
+
+        for(int f=0; f < 5; f++) {
+            /*(uint32_t tramsN = 4, uint32_t packetSize = 50, uint32_t totalTime = 300, bool saveAnim = true,
+                       uint32_t protocol = 2, uint32_t packetInterval = 1, bool runtimeIntervalChange = true)*/
+            Names::Clear();
+            Ptr<CBTC> cbtcExperiment = CreateObject<CBTC>(5, 50, 200.0, false, protocol, interval, false, 100);
+            cbtcExperiment->Run();
+
+            collisionCounts.push_back(cbtcExperiment->collisionCounter);
+
+        }
+
+        intervalSizeX.push_back(interval);
+        avgCollisionCountY.push_back(average(collisionCounts));
+        devCollisionCountY.push_back(deviation(collisionCounts));
+
+  }
+  visualize(intervalSizeX,
+            avgCollisionCountY,
+            devCollisionCountY,
+            "Number of collisions in relation to interval size during 50 sec ("+protocolStr+")",
+            "Interval size [s]",
+            "Number of collisions",
+            "IntervalSizeCollisionCount"+protocolStr);
+}
+
+
+
 int main(int argc, char **argv) {
 
   SeedManager::SetSeed(rand());
@@ -828,11 +990,18 @@ int main(int argc, char **argv) {
   //StopTramCount(1);
   //StopTramCount(2);
 
-  //StopCollisionCount(2); toto nie
+  //RangePacketCount(1);
+  //RangePacketCount(2);
 
-  Ptr<CBTC> cbtcExperiment = CreateObject<CBTC>(4, 50, 50.0, false, 1, 1, false, 100);
-  cbtcExperiment->Run();
-  cout << cbtcExperiment->receivedPacketsCounter << " " << cbtcExperiment->sentPacketsCounter << endl;
+  //TramCountLostPackets(1);
+  //TramCountLostPackets(2);
+
+  //ReceivedPacketsRatioOverTime(1);
+  //ReceivedPacketsRatioOverTime(2);
+
+  //IntervalSizeCollisionCount(1);
+  IntervalSizeCollisionCount(2);
+
 
   cout << "\nvybafco" << endl;
 
