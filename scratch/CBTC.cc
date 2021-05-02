@@ -978,8 +978,11 @@ void IntervalSizeCollisionCount(int protocol){
 
 int main(int argc, char **argv) {
 
-  SeedManager::SetSeed(rand());
-  SeedManager::SetRun(10);
+  Ptr<CBTC> cbtcExperiment = CreateObject<CBTC>();
+  cbtcExperiment->Run(argc,argv);
+
+//  SeedManager::SetSeed(rand());
+//  SeedManager::SetRun(10);
 
   //CollisionsOverTime(1);
   //CollisionsOverTime(2);
@@ -1000,10 +1003,8 @@ int main(int argc, char **argv) {
   //ReceivedPacketsRatioOverTime(2);
 
   //IntervalSizeCollisionCount(1);
-  IntervalSizeCollisionCount(2);
+  //IntervalSizeCollisionCount(2);
 
-
-  cout << "\nvybafco" << endl;
 
 
   return 0;
