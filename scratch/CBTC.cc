@@ -54,34 +54,35 @@ HODNOTENIE:
 #include <ns3/address.h>
 #include <ns3/animation-interface.h>
 #include <ns3/aodv-helper.h>
-#include <ns3/assert.h>
 #include <ns3/boolean.h>
 #include <ns3/callback.h>
 #include <ns3/command-line.h>
 #include <ns3/config.h>
 #include <ns3/double.h>
-#include <ns3/dsdv-helper.h>
-#include <ns3/dsr-helper.h>
-#include <ns3/dsr-main-helper.h>
 #include <ns3/event-id.h>
 #include <ns3/fatal-error.h>
+#include <ns3/flow-classifier.h>
+#include <ns3/flow-monitor.h>
+#include <ns3/flow-monitor-helper.h>
+#include <ns3/gnuplot.h>
 #include <ns3/inet-socket-address.h>
 #include <ns3/internet-stack-helper.h>
 #include <ns3/ipv4.h>
 #include <ns3/ipv4-address.h>
 #include <ns3/ipv4-address-helper.h>
+#include <ns3/ipv4-flow-classifier.h>
 #include <ns3/ipv4-global-routing-helper.h>
 #include <ns3/ipv4-interface-address.h>
 #include <ns3/log.h>
 #include <ns3/log-macros-disabled.h>
 #include <ns3/names.h>
 #include <ns3/node.h>
-#include <ns3/node-list.h>
 #include <ns3/object.h>
 #include <ns3/olsr-helper.h>
 #include <ns3/packet.h>
 #include <ns3/point-to-point-helper.h>
 #include <ns3/position-allocator.h>
+#include <ns3/rng-seed-manager.h>
 #include <ns3/simulator.h>
 #include <ns3/trace-source-accessor.h>
 #include <ns3/type-id.h>
@@ -89,9 +90,9 @@ HODNOTENIE:
 #include <ns3/wifi-helper.h>
 #include <ns3/wifi-mac-helper.h>
 #include <ns3/yans-wifi-helper.h>
-#include <stddef.h>
 #include <cstdlib>
 #include <ctime>
+#include <fstream>
 #include <iostream>
 #include <sstream>
 #include <utility>
@@ -133,8 +134,9 @@ vector<Vector> CBTC::stopPositions = { Vector(0.0, 0.0, 0.0),        //A
 
 
 
-CBTC::CBTC(uint32_t tramsN = 4, uint32_t packetSize = 50, uint32_t totalTime = 1000, bool saveAnim = true,
+CBTC::CBTC(uint32_t tramsN = 4, uint32_t packetSize = 50, uint32_t totalTime = 300, bool saveAnim = true,
            uint32_t protocol = 2, uint32_t packetInterval = 1, bool runtimeIntervalChange = true) {
+
   // CMD line argumenty
   this->tramsN = tramsN;
   this->packetSize = packetSize;
@@ -202,6 +204,7 @@ void CBTC::ReceivePacket (Ptr<Socket> socket) {
 
     }
 }
+
 
 
 void CBTC::GenerateTraffic (Ptr<Socket> socket, uint32_t pktSize, Time pktInterval ) {
@@ -516,8 +519,26 @@ void CBTC::SetApplications() {
 
 /********************************** Spustenie ************************************/
 
+void PrintNodeResults(double nodeNumber, Ipv4Address sourceAddress, Ipv4Address destinationAddress, double packetsSent, double packetsReceived, double throughput)
+{
+    std::cout << "Flow " << nodeNumber << " (" << sourceAddress << " -> " << destinationAddress << ")\n";
+    std::cout << "  Tx Packets: " << packetsSent << "\n";
+    std::cout << "  Rx Packets: " << packetsReceived << "\n";
+    std::cout << "  Throughput: " << throughput << " Mbps\n";
+}
 
 void CBTC::Run(int argc = -1, char **argv = nullptr) {
+
+      /*Gnuplot gnuplot("demolitionDerby-graph.svg");
+      gnuplot.SetTerminal("svg");
+      gnuplot.SetTitle("Throughput in relation to number of nodes");
+      gnuplot.SetLegend("Number of nodes", "Throughput [Mbps]");
+      // give the graph some padding on both sides
+     // gnuplot.AppendExtra("set xrange[-1:" + std::to_string(numOfTests*nodesMultiplier*1.2) + "]");
+
+      Gnuplot2dDataset gnuplotData;
+      gnuplotData.SetStyle (Gnuplot2dDataset::LINES_POINTS);
+      gnuplotData.SetErrorBars(Gnuplot2dDataset::Y);*/
 
   // CMD line
   if (argc > 0)
@@ -533,9 +554,10 @@ void CBTC::Run(int argc = -1, char **argv = nullptr) {
       packetIntervalTrace = packetInterval;
   }
 
-// L1
-  CreateNodes();
+  collisionCounter = 0;
 
+
+  CreateNodes();
   delay = tramsN;
   pauseLength = Seconds(tramsN + 2.0);
 
@@ -545,62 +567,161 @@ void CBTC::Run(int argc = -1, char **argv = nullptr) {
 
   Simulator::Schedule (Seconds (2), &CheckDistances, tramNodes);
 
-//  Simulator::Schedule (Seconds(5), &Stop, DynamicCast<WaypointMobilityModel>(tramNodes.Get(1)->GetObject<MobilityModel>()), 1);
-//  Simulator::Schedule (Seconds(18), &Stop, DynamicCast<WaypointMobilityModel>(tramNodes.Get(1)->GetObject<MobilityModel>()), 1);
-//  Simulator::Schedule (Seconds(25), &Stop, DynamicCast<WaypointMobilityModel>(tramNodes.Get(1)->GetObject<MobilityModel>()), 1);
-//  Simulator::Schedule (Seconds(30), &Stop, DynamicCast<WaypointMobilityModel>(tramNodes.Get(1)->GetObject<MobilityModel>()), 1);
-
 // L2
   SetP2PDevices();
-  NetDeviceContainer nicElektricky = SetWifiDevices();
-// L3
-  SetRouting(nicElektricky);
-// L4-L5
-  SetApplications();
 
-  // animacia
-  if (saveAnim) {
+  // L1
+  NetDeviceContainer nicElektricky = SetWifiDevices ();
+  // L3
+  SetRouting (nicElektricky);
+  // L4-L5
+  SetApplications ();
 
-    AnimationInterface anim ("CBTC_animacia.xml");
-    anim.EnablePacketMetadata();
+  // NetAnim
+  if (saveAnim)
+    {
 
-    for (uint32_t i = 0; i < stopsN; ++i){
-        anim.UpdateNodeColor(stopNodes.Get(i),0,0,200);
-        anim.UpdateNodeDescription (stopNodes.Get(i), Names::FindName(stopNodes.Get(i)));
-        anim.UpdateNodeSize(stopNodes.Get(i)->GetId(),10,10);
-    }
+      AnimationInterface anim ("CBTC_animacia.xml");
+      anim.EnablePacketMetadata ();
 
-    for (uint32_t i = 0; i < tramsN; ++i){
-        anim.UpdateNodeColor(tramNodes.Get(i),0,200,0);
-        anim.UpdateNodeDescription (tramNodes.Get(i), Names::FindName(tramNodes.Get(i)));
-        anim.UpdateNodeSize(tramNodes.Get(i)->GetId(),10,10);
-    }
+      for (uint32_t i = 0; i < stopsN; ++i)
+        {
+          anim.UpdateNodeColor (stopNodes.Get (i), 0, 0, 200);
+          anim.UpdateNodeDescription (stopNodes.Get (i),
+                                      Names::FindName (stopNodes.Get (i)));
+          anim.UpdateNodeSize (stopNodes.Get (i)->GetId (), 10, 10);
+        }
 
-    NS_LOG_UNCOND("[INFO] Animacia ulozena do CBTC_animacia.xml\n");
-//    cout << "[INFO] Animacia ulozena do CBTC_animacia.xml\n";
+      for (uint32_t i = 0; i < tramsN; ++i)
+        {
+          anim.UpdateNodeColor (tramNodes.Get (i), 0, 200, 0);
+          anim.UpdateNodeDescription (tramNodes.Get (i),
+                                      Names::FindName (tramNodes.Get (i)));
+          anim.UpdateNodeSize (tramNodes.Get (i)->GetId (), 10, 10);
+        }
 
-    Simulator::Stop(Seconds(totalTime));
-    Simulator::Run ();
-    Simulator::Destroy ();
-
-  } else {
-
-      Simulator::Stop (Seconds(totalTime));
+      NS_LOG_UNCOND("[INFO] Animacia ulozena do CBTC_animacia.xml\n");
+      Simulator::Stop (Seconds (totalTime));
       Simulator::Run ();
+
       Simulator::Destroy ();
+    }
+  else
+    {
+      Simulator::Stop (Seconds (totalTime));
+      Simulator::Run ();
+
+      Simulator::Destroy ();
+    }
+
+}
+
+
+void visualize (vector<int> X, vector<double> avgY, vector<double> devY, string title, string xAxis, string yAxis, string Volaco) {
+
+
+  Gnuplot graf (Volaco + ".svg");
+  graf.SetTerminal ("svg");
+  graf.SetTitle (title);
+  graf.SetLegend (xAxis, yAxis);
+
+  Gnuplot2dDataset data;
+  data.SetTitle("graf");
+  data.SetStyle (Gnuplot2dDataset::LINES_POINTS);
+
+  Gnuplot2dDataset errorBars;
+  errorBars.SetTitle("smerodajna odchylka");
+  errorBars.SetStyle(Gnuplot2dDataset::POINTS);
+  errorBars.SetErrorBars(Gnuplot2dDataset::Y);
+
+  for ( int i = 0; i < X.size(); i++) {
+    data.Add(X[i], avgY[i]);
+    errorBars.Add(X[i],avgY[i],devY[i]);
   }
 
+  graf.AddDataset(errorBars);
+  graf.AddDataset(data);
+
+  std::ofstream plotFile (Volaco + ".plt");
+  graf.GenerateOutput (plotFile);
+  plotFile.close ();
+  if (system (("gnuplot " + Volaco + ".plt").c_str()));
+}
+
+double average(vector<int> data){
+
+  double sum = 0.0;
+
+  for(int i = 0; i < data.size(); ++i)
+      {
+          sum += data[i];
+      }
+
+  return sum/data.size();
+
+}
+
+double deviation(vector<int> data) {
+    double sum = 0.0, standardDeviation = 0.0;
+
+    double mean = average(data);
+
+    for(int i = 0; i < data.size(); ++i)
+        standardDeviation += pow(data[i] - mean, 2);
+
+    return sqrt(standardDeviation / data.size());
 }
 
 
 /************************************ Main ***************************************/
 
-int main(int argc, char **argv) {
-//  CBTC cbtcExperiment;
-//  cbtcExperiment.Run(argc, argv);
 
-  Ptr<CBTC> cbtcExperiment = CreateObject<CBTC>();
-  cbtcExperiment->Run(argc, argv);
+void CollisionsOverTime(int protocol) {
+
+  string protocolStr = protocol == 1 ? "AODV" : "OLSR";
+
+  vector<int> timesX;
+  vector<double> avgCollisionsY;
+  vector<double> devCollisionsY;
+
+  for (int testNumber = 0, totalTime = 200; testNumber < 10; testNumber++, totalTime+=15) {
+
+        vector<int> collisionCounts;
+
+        for(int f=0; f < 3; f++) {
+            /*(uint32_t tramsN = 4, uint32_t packetSize = 50, uint32_t totalTime = 300, bool saveAnim = true,
+                       uint32_t protocol = 2, uint32_t packetInterval = 1, bool runtimeIntervalChange = true)*/
+            Names::Clear();
+            Ptr<CBTC> cbtcExperiment = CreateObject<CBTC>(4, 50, totalTime, false, protocol, 1, true);
+            cbtcExperiment->Run();
+            collisionCounts.push_back(cbtcExperiment->collisionCounter);
+
+        }
+
+        timesX.push_back(totalTime);
+        avgCollisionsY.push_back(average(collisionCounts));
+        devCollisionsY.push_back(deviation(collisionCounts));
+
+  }
+  visualize(timesX,
+            avgCollisionsY,
+            devCollisionsY,
+            "Number of collisions over time ("+protocolStr+")",
+            "Time [s]",
+            "Collisions",
+            "CollisionsOverTime"+protocolStr);
+
+}
+
+
+int main(int argc, char **argv) {
+
+  SeedManager::SetSeed(rand());
+  SeedManager::SetRun(10);
+
+  CollisionsOverTime(1);
+  CollisionsOverTime(2);
+
 
   return 0;
 }

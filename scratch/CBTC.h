@@ -25,8 +25,8 @@ class CBTC: public Object {
 
 public:
 
-  CBTC( uint32_t pocetElektriciek, uint32_t velkostPaketu, uint32_t trvanieSimulacie, bool ulozAnimaciu,
-        uint32_t routingProtokol, uint32_t intervalPaketov, bool runtimeZmenaIntevalu);
+  CBTC( uint32_t tramsN, uint32_t packetSize, uint32_t totalTime, bool saveAnim,
+        uint32_t protocol, uint32_t packetInterval, bool runtimeIntervalChange);
 
   ~CBTC();
 
