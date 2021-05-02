@@ -25,8 +25,8 @@ class CBTC: public Object {
 
 public:
 
-  CBTC( uint32_t pocetElektriciek, uint32_t velkostPaketu, uint32_t trvanieSimulacie,
-       bool ulozAnimaciu, uint32_t routingProtokol, uint32_t intervalPaketov, bool runtimeZmenaIntevalu);
+  CBTC( uint32_t pocetElektriciek, uint32_t velkostPaketu, uint32_t trvanieSimulacie, bool ulozAnimaciu,
+        uint32_t routingProtokol, uint32_t intervalPaketov, bool runtimeZmenaIntevalu);
 
   ~CBTC();
 
@@ -40,10 +40,11 @@ public:
   // CMD line argumenty
   uint32_t tramsN, packetSize, totalTime, protocol, packetInterval;
   bool saveAnim, runtimeIntervalChange;
-  TracedValue<int32_t> packetIntervalTrace = 5.0; // trace-ovana zmena intervalu posielania paketov
+  TracedValue<int32_t> packetIntervalTrace = 2.0; // trace-ovana zmena intervalu posielania paketov
 
   // pohyb elektriciek
-  static double interval, delay;
+  static double delay;
+  static int32_t collisionCounter;
   static Time stopLength;
   static Time pauseLength;
   static vector<int> path;
@@ -76,7 +77,7 @@ public:
   static void StopTramMovement(Ptr<WaypointMobilityModel> elektricka, int id);
   static void ScheduleNextStop(Ptr<WaypointMobilityModel> model, int id);
   static void SetStop(int id);
-
+  static void CheckDistances (NodeContainer tramNodes);
   // posielanie paketov
   static void GenerateTraffic(Ptr<Socket> socket, uint32_t pktSize, Time pktInterval);
   static void ReceivePacket(Ptr<Socket> socket);
